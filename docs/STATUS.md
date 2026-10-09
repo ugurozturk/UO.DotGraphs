@@ -1,6 +1,6 @@
 # Gerçekleşen durum
 
-Son güncelleme: **2026-10-09**.
+Son güncelleme: **2026-10-10**.
 
 **Faz 11 sağlamlaştırması uygulandı; bütün release kabul kapıları kapatılmadı.**
 Tanımlı sürüm **UO.Graphs 0.9.0**, paket **UO.Graphs.Cli**, komut **uographs**.
@@ -8,6 +8,52 @@ JSON envelope **4** / SQLite **3** / context-export **1** korunur.
 Yeni ürün analiz alanı, servis veya dependency eklenmedi.
 [Önceki faz](history/PHASE10.md), [release readiness ve kısa kullanım](RELEASE.md),
 [ölçümler](PERFORMANCE.md), [güven sınırı](SECURITY.md).
+
+## Generator cancellation CI testi — 2026-10-10
+
+Paylaşılan Linux CI çıktısında unit **55/55 PASS**; integration generator testi
+başlangıç marker'ını 90 saniyede göremedi. Bu çıktı generator cancellation'ının
+başarısız olduğunu değil, cancellation assertion'ına ulaşılamadığını gösterir.
+Eski test macOS ARM64 üzerinde normal, `DOTNET_PROCESSOR_COUNT=2` ve `=1`
+koşullarında ayrı ayrı **1/1 PASS**; Linux timeout'u yerelde yeniden üretilmedi.
+
+`Phase11GeneratorCancellationTests.cs` içindeki test düzeni sağlamlaştırıldı:
+
+- In-process index testi, process-wide MSBuild ortamını değiştiren CLI testleriyle
+  çakışmaması için paralel çalışmayan ayrı xUnit collection'a alındı.
+- Repo dışında oluşturulan fixture'a repo `global.json` dosyası kopyalanır;
+  runner'ın en yeni SDK'sının örtük seçilmesi önlenir.
+- Senkron generator ve marker/cancel bekleyişi xUnit synchronization context'ini
+  paylaşmaz; gerçek `IncrementalIndexer.RunAsync` ayrı task'ta çalışır.
+- Ürün ilerleme satırları süreleriyle test çıktısına ve timeout mesajına eklenir.
+  90 saniyelik başlangıç, 10 saniyelik cancellation, 20 saniyelik cleanup sınırları
+  ve token/observed/exception assertion'ları korunur. Ürün kodu değişmedi.
+
+Doğrulama kayıtları `.uographs/generator-ci-fix/` altında. Release build:
+`dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`
+**PASS**, 23.65 sn, 0 warning / 0 error.
+
+Odaklı test komutları (macOS ARM64, SDK 10.0.201):
+
+```sh
+DOTNET_PROCESSOR_COUNT=2 dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Phase11GeneratorCancellationTests|FullyQualifiedName~GeneratorsNeedPermissionAndGeneratedPolicyDoesNotRunDiagnosticAnalyzers|FullyQualifiedName~NewlyCreatedImplicitUserImportIsStaleAndRebindsCompilation|FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses' --logger 'console;verbosity=normal' --logger 'trx;LogFileName=focused.trx' --results-directory .uographs/generator-ci-fix
+DOTNET_PROCESSOR_COUNT=1 dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~Phase11GeneratorCancellationTests --logger 'console;verbosity=normal' --logger 'trx;LogFileName=single-cpu.trx' --results-directory .uographs/generator-ci-fix
+```
+
+- İki işlemci koşulu: **PASS 4/4**, skipped 0, toplam 69.88 sn; generator **3.749 sn**.
+  Gerçek CLI HelloGraph index ve ayrı proseslerde query/status smoke dahil.
+  Aynı koşuda generator izin politikası ve geçici MSBuild user import testi geçti.
+- Tek işlemci koşulu: **PASS 1/1**, skipped 0, toplam 6.07 sn.
+- `focused.trx` içindeki generator çıktısında fingerprint/invalidation ve workspace
+  loading satırlarının süreleri bulunduğu ayrıca kontrol edildi.
+- `git diff --check`: **PASS**.
+
+Linux/GitHub tekrar koşusu **NOT RUN**; bu değişiklik Linux kök nedeninin
+doğrulandığı veya CI kabulünün kapandığı anlamına gelmez. Tam .NET suite tekrar
+koşulmadı; yukarıdaki odaklı testler ilgili davranışları kapsar.
+Yeni bağımlılık, restore, commit/push/publish yok.
+Değişen dosyalar: integration `Phase11GeneratorCancellationTests.cs`, `docs/STATUS.md`.
+Önerilen commit: `fix(tests): isolate generator cancellation acceptance from runner state`
 
 ## GitHub/NuGet yayın otomasyonu — 2026-10-09
 
