@@ -14,6 +14,7 @@ public sealed partial class CliTests
         var input = Path.Combine(fixture, "Phase2.slnx");
         var options = new[] { "--framework", "net10.0" };
         var first = await IndexPath(input, options);
+        Assert.True(first.Fingerprint!.Complete, string.Join(Environment.NewLine, first.Fingerprint.Limitations));
         var noOp = await Run(["index", input, "--trust-project", "--incremental", "--db", Database, .. options]);
         Assert.True(noOp.Code == 0, noOp.Error);
         using (var json = JsonDocument.Parse(noOp.Output))
@@ -201,7 +202,7 @@ public sealed partial class CliTests
             var fixture = CopyFixture("implicit-import");
             var input = Path.Combine(fixture, "Library/Library.csproj");
             var original = await IndexPath(input, "--framework", "net10.0");
-            Assert.True(original.Fingerprint!.Complete);
+            Assert.True(original.Fingerprint!.Complete, string.Join(Environment.NewLine, original.Fingerprint.Limitations));
             var importDirectory = Path.Combine(extensions, "Current/Microsoft.CSharp.targets/ImportBefore");
             Directory.CreateDirectory(importDirectory);
             await File.WriteAllTextAsync(Path.Combine(importDirectory, "Custom.targets"),

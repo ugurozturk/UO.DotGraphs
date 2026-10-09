@@ -9,6 +9,45 @@ Yeni ürün analiz alanı, servis veya dependency eklenmedi.
 [Önceki faz](history/PHASE10.md), [release readiness ve kısa kullanım](RELEASE.md),
 [ölçümler](PERFORMANCE.md), [güven sınırı](SECURITY.md).
 
+## Ortak fixture SDK seçimi — 2026-10-10
+
+[Linux CI 37991790585](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37991790585)
+unit **55/55 PASS**, integration **94 PASS / 4 FAIL** verdi. Tam log'da
+freshness hatasının sonunda `SDK outside the validated base-SDK dependency model`
+tanısı da bulunuyor. Generator dışındaki üç hata aynı fingerprint eksikliğini
+gösteriyor: `Complete` false, `--require-fresh` unknown reddi ve noOp yerine rebuild.
+
+`CopyFixture` yalnız `samples/Phase2` altını geçici dizine kopyalıyordu; repo
+kökündeki `global.json` kapsam dışında kalıyordu. Birden çok SDK bulunan runner'da
+geçici proje için yapılan SDK seçimi repo pin'inden ayrılabiliyordu. Ortak yardımcı
+artık repo `global.json` dosyasını fixture köküne de kopyalar. Önceki generator
+düzeltmesindeki pin korunur. Ürünün bilinmeyen dependency durumunda reuse'u kapatan
+kontrolü, freshness beklentileri veya timeout sınırları değiştirilmedi.
+
+Yeni `CopiedFixtureSelectsRepositorySdkOutsideCheckout` regresyonu, geçici üst
+dizinde çakışan `99.0.100` SDK talebi oluşturarak gerçek `dotnet --version` seçimini
+sınar. Böylece yalnız tek SDK kurulu geliştirme makinesinde de eksik pin yakalanır.
+Test düzeltme öncesinde **FAIL**: SDK resolver üst dizindeki `99.0.100` talebini
+seçti (`sdk-selection-red.trx`). İlk test yazımındaki eksik temporary directory
+hazırlığı ayrıca düzeltildi; o ilk failure SDK regresyonunun kanıtı sayılmaz.
+Phase6 Complete assertion'ları artık fingerprint limitation nedenlerini gösterir;
+incremental oracle'a ilk snapshot için Complete assertion'ı da eklendi.
+
+Yerel macOS ARM64 / SDK 10.0.201 kayıtları `.uographs/ci-sdk-fixture-fix/` altında:
+
+- `dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`:
+  **PASS**, 17.31 sn, 0 warning / 0 error.
+- `dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit.trx' --results-directory .uographs/ci-sdk-fixture-fix`:
+  **PASS 55/55**, skipped 0, 6 sn.
+- Kullanıcının açık onayıyla `dotnet msbuild samples/HelloGraph/HelloGraph.Domain/HelloGraph.Domain.csproj -nologo -getProperty:MSBuildToolsPath,MSBuildExtensionsPath,MSBuildSDKsPath`:
+  **PASS**; tools/extensions `/usr/local/share/dotnet/sdk/10.0.201`, SDKs aynı
+  dizinin `Sdks` altı. Restore/build hedefi verilmedi; bu macOS gözlemidir.
+
+Son ortak-fixture düzeltmesinin Linux/Windows ve GitHub CI doğrulaması **NOT RUN**.
+Yeni dependency/restore, commit/push/publish yok. Değişen dosyalar:
+`Phase2Tests.cs`, `Phase6Tests.cs`, `docs/STATUS.md`.
+Önerilen commit: `fix(tests): preserve pinned SDK in copied integration fixtures`
+
 ## Generator cancellation CI testi — 2026-10-10
 
 Paylaşılan Linux CI çıktısında unit **55/55 PASS**; integration generator testi

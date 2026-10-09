@@ -1,11 +1,26 @@
 using System.Text.Json;
 using UO.Graphs.Core;
+using UO.Graphs.Roslyn;
 using UO.Graphs.Storage.Sqlite;
 
 namespace UO.Graphs.IntegrationTests;
 
 public sealed partial class CliTests
 {
+    [Fact]
+    public async Task CopiedFixtureSelectsRepositorySdkOutsideCheckout()
+    {
+        // A conflicting ancestor makes missing fixture SDK isolation fail even
+        // on development machines that have only the repository SDK installed.
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, "global.json"),
+            """{"sdk":{"version":"99.0.100","rollForward":"disable"}}""");
+        var fixture = CopyFixture("sdk-selection");
+        using var pinned = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Root, "global.json")));
+        var selected = await ProjectPreparation.GetSdkVersionAsync(Path.Combine(fixture, "Library"));
+        Assert.Equal(pinned.RootElement.GetProperty("sdk").GetProperty("version").GetString(), selected);
+    }
+
     [Fact]
     public async Task SolutionFormatsAndProjectInputKeepReferencesAndSymbolIdentities()
     {
@@ -216,6 +231,9 @@ public sealed partial class CliTests
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target);
         }
+        // These projects leave the checkout and its ancestor SDK pin. Preserve
+        // the same SDK for preparation, preprocessing and workspace loading.
+        File.Copy(Path.Combine(Root, "global.json"), Path.Combine(destination, "global.json"));
         return destination;
     }
 }
