@@ -1,0 +1,27 @@
+# Import into your on-prem Azure DevOps Server. This example was NOT RUN.
+# Agent image is provisioned internally with SDK 10.0.201, Python 3 and approved
+# offline NuGet cache/feed. No hosted pool, download task or artifact upload.
+trigger: none
+pr: none
+pool:
+  name: UOGraphs-OnPrem-SelfHosted
+steps:
+- checkout: self
+  clean: false
+- script: >-
+    dotnet restore UO.Graphs.slnx --locked-mode --configfile "$(OfflineNuGetConfig)" -m:1 -nr:false -p:NuGetAudit=false
+  displayName: Explicit preparation from approved offline feed
+- script: >-
+    dotnet restore samples/Phase2/Fixtures.slnx --locked-mode --configfile "$(OfflineNuGetConfig)" -m:1 -nr:false -p:NuGetAudit=false
+  displayName: Prepare integration fixtures
+- script: >-
+    dotnet restore samples/Phase3/Semantics.csproj --locked-mode --configfile "$(OfflineNuGetConfig)" -m:1 -nr:false -p:NuGetAudit=false
+  displayName: Prepare semantic fixtures
+- script: >-
+    dotnet build samples/Phase2/Generator/Generator.csproj --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+  displayName: Prepare generator fixture
+- script: >-
+    python3 scripts/verify_release.py --evidence "$(Agent.TempDirectory)/uographs-$(Build.BuildId)"
+  displayName: Build, tests, licenses, local pack/install, CLI smoke
+# Evidence remains on the self-hosted agent under organization retention policy.
+# Do not add PublishPipelineArtifact or upload private code/graphs by default.

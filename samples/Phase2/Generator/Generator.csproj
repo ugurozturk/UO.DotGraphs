@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsRoslynComponent>true</IsRoslynComponent><TargetFramework>netstandard2.1</TargetFramework></PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" /></ItemGroup>
+</Project>

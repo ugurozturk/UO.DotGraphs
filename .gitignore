@@ -1,0 +1,64 @@
+# UO.Graphs databases and SQLite sidecars (including custom --db paths)
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*-wal
+*-shm
+*-journal
+*.writer.lock
+
+# Extension rules above must not hide source directories such as
+# src/UO.Graphs.Storage.Sqlite when core.ignorecase=true.
+# Keep directory exclusions below this exception.
+!*/
+
+# UO.Graphs local indexes, smoke evidence, exports and benchmark datasets
+.uographs/
+
+# .NET build, publish and package outputs
+[Bb]in/
+[Oo]bj/
+/artifacts/
+/publish/
+*.nupkg
+*.snupkg
+*.binlog
+
+# Test and coverage outputs
+[Tt]est[Rr]esults/
+/coverage/
+*.trx
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+coverage.opencover.xml
+BenchmarkDotNet.Artifacts/
+
+# Visual Studio, Rider and per-user solution settings
+.vs/
+.idea/
+_ReSharper*/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Python helper-script caches and local virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# OS metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Keep packages.lock.json, NuGet.Config, .config/dotnet-tools.json,
+# checked-in *.g.cs fixtures and shared editor configuration versioned.

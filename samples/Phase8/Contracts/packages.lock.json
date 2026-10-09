@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "MassTransit.Abstractions": {
+        "type": "Project"
+      },
+      "MediatR": {
+        "type": "Project",
+        "dependencies": {
+          "MediatR.Contracts": "[2.0.1, )"
+        }
+      },
+      "MediatR.Contracts": {
+        "type": "CentralTransitive",
+        "requested": "[2.0.1, )",
+        "resolved": "2.0.1",
+        "contentHash": "FYv95bNT4UwcNA+G/J1oX5OpRiSUxteXaUt2BJbRSdRNiIUNbggJF69wy6mnk2wYToaanpdXZdCwVylt96MpwQ=="
+      }
+    }
+  }
+}

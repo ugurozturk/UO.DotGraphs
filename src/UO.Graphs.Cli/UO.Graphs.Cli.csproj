@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>uographs</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>uographs</ToolCommandName>
+    <PackageId>UO.Graphs.Cli</PackageId>
+    <Description>Local C# evidence graph CLI; requires a prepared .NET SDK and explicit MSBuild trust.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" PrivateAssets="all" />
+    <ProjectReference Include="../UO.Graphs.Roslyn/UO.Graphs.Roslyn.csproj" />
+    <ProjectReference Include="../UO.Graphs.Storage.Sqlite/UO.Graphs.Storage.Sqlite.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="/" />
+    <None Include="../../docs/licenses/**/*" Pack="true" PackagePath="licenses/" />
+    <None Include="../../docs/**/*.md" Pack="true" PackagePath="docs/" />
+    <None Include="../../docs/schemas/*.json" Pack="true" PackagePath="docs/schemas/" />
+    <None Include="../../scripts/install_skill.py;../../scripts/safe_export.py" Pack="true" PackagePath="scripts/" />
+    <None Include="../../templates/copilot/**/*" Pack="true" PackagePath="templates/copilot/" />
+  </ItemGroup>
+</Project>

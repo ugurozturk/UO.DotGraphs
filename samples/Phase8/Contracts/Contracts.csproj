@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../ContractFixtures/MediatR/MediatR.ContractFixture.csproj" />
+    <ProjectReference Include="../ContractFixtures/MassTransit/MassTransit.ContractFixture.csproj" />
+  </ItemGroup>
+</Project>

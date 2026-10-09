@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="HelloGraph.Domain/HelloGraph.Domain.csproj" />
+  <Project Path="HelloGraph.App/HelloGraph.App.csproj" />
+</Solution>

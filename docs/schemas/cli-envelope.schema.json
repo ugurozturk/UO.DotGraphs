@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:uographs:cli-envelope:4",
+  "title": "UO.Graphs CLI envelopes (query 4, context/export 1)",
+  "description": "Envelope compatibility schema; nested graph metadata remains extensible. NDJSON lines, help and stderr are not JSON documents governed by this schema. Confidence and evidence contracts are documented separately.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "command",
+        "snapshotId",
+        "analysisContext",
+        "completeness",
+        "stale",
+        "truncated",
+        "items",
+        "diagnostics",
+        "limits",
+        "outcome"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 4
+        },
+        "command": {
+          "enum": [
+            "query.find",
+            "query.symbol",
+            "query.callers",
+            "query.callees",
+            "query.dependencies",
+            "query.impact",
+            "query.path"
+          ]
+        },
+        "analysisContext": {
+          "type": "object",
+          "required": [
+            "id",
+            "coverage",
+            "freshness",
+            "limitations",
+            "projects"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "freshness": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unknown",
+                "notChecked"
+              ]
+            },
+            "projects": {
+              "type": "array"
+            },
+            "limitations": {
+              "type": "array"
+            }
+          }
+        },
+        "completeness": {
+          "type": "object",
+          "required": [
+            "coverage",
+            "limitations"
+          ],
+          "properties": {
+            "coverage": {
+              "type": "string"
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "stale": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown",
+            "notChecked"
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array"
+        },
+        "diagnostics": {
+          "type": "array"
+        },
+        "limits": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "required": [
+        "formatVersion",
+        "command",
+        "snapshotId",
+        "analysisContext",
+        "completeness",
+        "stale",
+        "selected",
+        "relationships",
+        "warnings",
+        "truncated",
+        "truncationReasons",
+        "budget"
+      ],
+      "properties": {
+        "formatVersion": {
+          "const": 1
+        },
+        "command": {
+          "const": "context"
+        },
+        "completeness": {
+          "type": "object",
+          "required": [
+            "coverage",
+            "limitations"
+          ],
+          "properties": {
+            "coverage": {
+              "type": "string"
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "stale": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown",
+            "notChecked"
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "relationships": {
+          "type": "array"
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "maxChars",
+            "actualChars",
+            "unit"
+          ],
+          "properties": {
+            "unit": {
+              "const": "unicodeScalarValuesIncludingFinalLF"
+            },
+            "actualChars": {
+              "type": "integer"
+            },
+            "maxChars": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "command",
+        "analysis",
+        "outcome",
+        "granularity",
+        "projectsAnalyzed",
+        "fingerprintMilliseconds",
+        "analysisMilliseconds",
+        "filesHashed",
+        "bytesHashed",
+        "entityCount",
+        "relationshipCount",
+        "occurrenceCount"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": 4
+        },
+        "command": {
+          "const": "index"
+        },
+        "analysis": {
+          "type": "object",
+          "required": [
+            "id",
+            "coverage",
+            "freshness",
+            "limitations",
+            "projects"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "freshness": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unknown",
+                "notChecked"
+              ]
+            },
+            "projects": {
+              "type": "array"
+            },
+            "limitations": {
+              "type": "array"
+            }
+          }
+        },
+        "outcome": {
+          "enum": [
+            "noOp",
+            "rebuiltAllProjects"
+          ]
+        },
+        "granularity": {
+          "const": "entireSelectedProjectClosure"
+        },
+        "projectsAnalyzed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "command",
+        "schemaVersion",
+        "analysis",
+        "entityCount",
+        "relationshipCount",
+        "occurrenceCount"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": 4
+        },
+        "command": {
+          "const": "status"
+        },
+        "schemaVersion": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "analysis": {
+          "type": "object",
+          "required": [
+            "id",
+            "coverage",
+            "freshness",
+            "limitations",
+            "projects"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "freshness": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unknown",
+                "notChecked"
+              ]
+            },
+            "projects": {
+              "type": "array"
+            },
+            "limitations": {
+              "type": "array"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "required": [
+        "contractVersion",
+        "command",
+        "runtime",
+        "sdk",
+        "automaticRestore",
+        "targetProjectChecked",
+        "preparation"
+      ],
+      "properties": {
+        "contractVersion": {
+          "const": 4
+        },
+        "command": {
+          "const": "doctor"
+        },
+        "automaticRestore": {
+          "const": false
+        },
+        "targetProjectChecked": {
+          "const": false
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "required": [
+        "metadata",
+        "nodes",
+        "relationships"
+      ],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "required": [
+            "command",
+            "formatVersion",
+            "snapshotId",
+            "analysisContext",
+            "completeness",
+            "stale",
+            "truncated",
+            "truncationReasons"
+          ],
+          "properties": {
+            "command": {
+              "const": "export"
+            },
+            "formatVersion": {
+              "const": 1
+            },
+            "completeness": {
+              "type": "object",
+              "required": [
+                "coverage",
+                "limitations"
+              ],
+              "properties": {
+                "coverage": {
+                  "type": "string"
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "stale": {
+              "enum": [
+                "fresh",
+                "stale",
+                "unknown",
+                "notChecked"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "nodes": {
+          "type": "array"
+        },
+        "relationships": {
+          "type": "array"
+        }
+      },
+      "additionalProperties": true
+    }
+  ]
+}

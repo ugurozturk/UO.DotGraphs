@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../tests/UO.Graphs.UnitTests/UO.Graphs.UnitTests.csproj" />
+    <ProjectReference Include="../../tests/UO.Graphs.IntegrationTests/UO.Graphs.IntegrationTests.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

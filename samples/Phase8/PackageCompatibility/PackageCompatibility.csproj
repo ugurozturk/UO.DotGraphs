@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="MassTransit.Abstractions" />
+    <Compile Include="../Contracts/Flows.cs" Link="Flows.cs" />
+  </ItemGroup>
+</Project>

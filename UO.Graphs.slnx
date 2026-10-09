@@ -1,0 +1,20 @@
+<Solution>
+  <Project Path="samples/Phase9/Abp/Abp.csproj" />
+  <Project Path="samples/Phase9/EfCore/EfCore.csproj" />
+  <Project Path="samples/Phase9/Refit/Refit.csproj" />
+  <Project Path="samples/Phase8/PackageCompatibility/PackageCompatibility.csproj" />
+  <Project Path="samples/Phase8/Uo/Uo.csproj" />
+  <Project Path="samples/Phase8/Contracts/Contracts.csproj" />
+  <Project Path="samples/Phase8/ContractFixtures/MediatR/MediatR.ContractFixture.csproj" />
+  <Project Path="samples/Phase8/ContractFixtures/MassTransit/MassTransit.ContractFixture.csproj" />
+  <Project Path="samples/Phase7/MinimalWeb/MinimalWeb.csproj" />
+  <Project Path="samples/Phase7/Frameworks.csproj" />
+  <Project Path="samples/HelloGraph/HelloGraph.App/HelloGraph.App.csproj" />
+  <Project Path="samples/HelloGraph/HelloGraph.Domain/HelloGraph.Domain.csproj" />
+  <Project Path="src/UO.Graphs.Cli/UO.Graphs.Cli.csproj" />
+  <Project Path="src/UO.Graphs.Core/UO.Graphs.Core.csproj" />
+  <Project Path="src/UO.Graphs.Roslyn/UO.Graphs.Roslyn.csproj" />
+  <Project Path="src/UO.Graphs.Storage.Sqlite/UO.Graphs.Storage.Sqlite.csproj" />
+  <Project Path="tests/UO.Graphs.IntegrationTests/UO.Graphs.IntegrationTests.csproj" />
+  <Project Path="tests/UO.Graphs.UnitTests/UO.Graphs.UnitTests.csproj" />
+</Solution>

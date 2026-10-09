@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable><AssemblyName>Phase9.RefitFixture</AssemblyName><PackageId>Phase9.RefitFixture</PackageId></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Refit" PrivateAssets="all" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

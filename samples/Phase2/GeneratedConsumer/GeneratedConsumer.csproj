@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><Analyzer Include="../Generator/bin/Debug/netstandard2.1/Generator.dll" /></ItemGroup>
+</Project>

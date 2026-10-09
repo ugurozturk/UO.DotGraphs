@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><ProjectReference Include="../Library/Library.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ReleaseDependency/ReleaseDependency.csproj" Condition="'$(Configuration)' == 'Release'" />
+    <Compile Remove="ReleaseUse.cs" />
+    <Compile Include="ReleaseUse.cs" Condition="'$(Configuration)' == 'Release'" />
+  </ItemGroup>
+</Project>

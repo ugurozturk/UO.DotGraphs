@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../HelloGraph.Domain/HelloGraph.Domain.csproj" />
+  </ItemGroup>
+</Project>

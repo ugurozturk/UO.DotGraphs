@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <!-- LGPL-3.0-only: analysis fixture only; never a product reference. -->
+    <PackageReference Include="Volo.Abp.AspNetCore.Mvc" PrivateAssets="all" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Missing/Missing.csproj" />
+    <Compile Include="MissingFile.cs" />
+  </ItemGroup>
+</Project>
