@@ -8,8 +8,8 @@ return await Cli.RunAsync(args);
 
 internal static class Cli
 {
-    private const string Help = """
-        UO.Graphs 0.9.0 — local C# symbol index
+    private static readonly string Help = $"""
+        UO.Graphs {ProductVersion.Current} — local C# symbol index
         Usage:
           uographs --help
           uographs doctor

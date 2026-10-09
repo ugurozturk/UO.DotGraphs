@@ -12,6 +12,68 @@ Gerçek API sözleşmeleri, mesaj kimliği ve belirsizlik sınırları: [MESSAGI
 [Context bütçesi, kaynak gizliliği ve export sözleşmesi](docs/CONTEXT-EXPORT.md).
 [İlişki yönleri ve destek matrisi](docs/RELATIONSHIPS.md). [Gerçek kabul sonuçları](docs/STATUS.md).
 
+## NuGet'ten kurulum
+
+Paket adı **UO.Graphs.Cli**, terminal komutu **uographs**. .NET 10 SDK kurulu
+olmalıdır; analiz edilecek projenin seçtiği SDK ve restore edilmiş bağımlılıkları
+da gerekir. İlk başarılı NuGet yayını sonrasında:
+
+```sh
+dotnet tool install --global UO.Graphs.Cli --source https://api.nuget.org/v3/index.json
+uographs --help
+uographs doctor
+```
+
+Güncelleme: `dotnet tool update --global UO.Graphs.Cli`.
+Komut bulunamazsa global tool dizininin PATH'te olduğunu kontrol edin:
+macOS/Linux `$HOME/.dotnet/tools`, Windows `%USERPROFILE%\.dotnet\tools`.
+
+Proje bazında kurulum için repo kökünde, manifest henüz yoksa bir kez
+`dotnet new tool-manifest` çalıştırın. Ardından:
+
+```sh
+dotnet tool install --local UO.Graphs.Cli --source https://api.nuget.org/v3/index.json
+dotnet tool run uographs --help
+# Başka makinede, commit edilmiş manifestteki sürümü kurar:
+dotnet tool restore
+```
+
+Belirli bir yayımlanmış sürümü seçmek için install/update komutuna
+`--version X.Y.Z` ekleyin. Paket sürümleri ve yayımlanma durumu
+[NuGet paket sayfasında](https://www.nuget.org/packages/UO.Graphs.Cli) görülür;
+workflow dosyalarının mevcut olması paketin yayımlandığı anlamına gelmez.
+
+İlk kullanım, hedef projenin klasöründe:
+
+```sh
+# Bağımlılık hazırlığı ayrı, açık bir kurulum adımıdır:
+dotnet restore Example.slnx
+uographs index Example.slnx --trust-project
+uographs query find MyService
+uographs status
+```
+
+Local manifest kullanıyorsanız `uographs` yerine `dotnet tool run uographs`
+kullanın. `--trust-project`, projenin MSBuild kodunun çalışmasına izin verir;
+sandbox sağlamaz. CLI index sırasında kendiliğinden restore/download yapmaz.
+
+## GitHub üzerinden release
+
+`main` branch'ine her push, [build-test-pack](.github/workflows/ci.yml) akışını
+başlatır: kilitli restore, Release build/test, lisans kontrolü, pack ve paketten
+gerçek kurulum → index → query → context. Başarılı olduğunda
+[publish-nuget](.github/workflows/publish-nuget.yml) aynı CI artifact'ını
+yeniden derlemeden **NuGet Trusted Publishing (OIDC)** ile yayımlar.
+PR ve elle başlatılan CI yalnız doğrular; NuGet'e göndermez.
+
+Paket sürümü doğrudan `Directory.Build.props` içindeki **`<Version>`** değeridir;
+CI sürümü artırmaz veya çalıştırma numarası eklemez. Yeni release için bu değeri
+elle değiştirip `main`'e gönderin. Örneğin `<Version>0.9.1</Version>` paketi
+**0.9.1** olarak yayımlar. Aynı sürüm NuGet'te zaten varsa yayın atlanır.
+Kalıcı NuGet API key yoktur.
+İlk yayından önce `uozturk` hesabında repository/workflow eşleşen policy
+oluşturulmalıdır: [Trusted Publishing kurulumu ve release adımları](docs/RELEASE.md#github-actions-ve-nuget-trusted-publishing).
+
 ## VS Code GitHub Copilot skill
 
 [Skill](.github/skills/uographs/SKILL.md), çalışan CLI'ı terminalden kullanır;

@@ -1,4 +1,4 @@
-# Yerel dağıtım ve release readiness
+# Dağıtım ve release readiness
 
 Faz 11, mevcut UO.Graphs 0.9.0 kapsamını sağlamlaştırır. Yeni analiz alanı veya
 hosted servis eklemez. Paket **UO.Graphs.Cli**, komut **uographs**; JSON envelope 4,
@@ -6,13 +6,90 @@ SQLite 3, context/export 1 korunur. Somut sonuçlar [STATUS](STATUS.md), ölçü
 [PERFORMANCE](PERFORMANCE.md), güven sınırı [SECURITY](SECURITY.md) içindedir.
 Tam release kabulü, açık kalan platform/IPC/offline kapıları kapanana kadar verilmez.
 
-Kurulu tool'un workspace timeout'u ayrıca çocuk proses seviyesinde incelendi:
+İlk Faz 11 koşusunda kurulu tool'un workspace timeout'u çocuk proses seviyesinde incelendi:
 paket ve repo BuildHost'u `.NET 10.0.5` üzerinde başlayıp named pipe açarken
 `SocketException (13): Permission denied` ile durdu. İki BuildHost dizininin
 20 dosyası SHA-256 bakımından aynı. Bu ortamda eksik paket payload'ı kanıtlanmadı;
-kurulu index kabulü, yerel IPC'ye kurumca izin verilen agent'ta yeniden yapılmalı.
+sonraki GitHub/NuGet otomasyonu turunda izinli yerel macOS koşusunda Release
+paketinden kurulum ve yeni DB üzerinde index/query/context geçti. Bu iki farklı
+koşul birbirinin yerine geçmez; güncel komut ve sonuçlar STATUS'tadır.
 Ham stderr ve karşılaştırma `.uographs/phase11-followup/buildhost-probe-locale.json`
 içindedir. Genel bir timeout mesajı tek başına bu nedenin kanıtı değildir.
+
+## GitHub Actions ve NuGet Trusted Publishing
+
+Bu repository için iki workflow vardır:
+
+- `ci.yml` / `build-test-pack`: `main` push, pull request veya elle çalıştırma.
+  Ubuntu 24.04 üzerinde global.json'daki SDK ile locked restore, Release build,
+  unit/integration testleri, lisans ve paket kapısı testleri çalışır. CLI paketi
+  `--no-build --no-restore` ile üretilir. Yeni tool-path ve ayrı NuGet cache'e
+  yalnız yerel feed'den kurulur; trust reddi ve **yeni DB üzerinde gerçek
+  index/query/context** zorunludur. Repo tarafından üretilmiş DB kullanılmaz.
+- `publish-nuget.yml`: yalnız `ugurozturk/UO.DotGraphs` içindeki başarılı
+  **main push** CI çalışmasını kabul eder. PR/fork/workflow_dispatch sonuçları
+  publish başlatmaz. Tamamlanan CI'ın run-id'sinden artifact indirilir; paket
+  kimliği/sürümü, kaynak commit'i ve SHA-256 manifest'i kontrol edilir. Restore,
+  build, pack veya artifact içinden script çalıştırma yapılmaz. `NuGet/login@v1`
+  ile kısa ömürlü anahtar alınıp aynı `.nupkg` gönderilir.
+
+`packages-and-test-results` artifact'ı yalnız nupkg, paket manifest'i ve TRX
+sonuçlarını 14 gün saklar. Graph DB, `.uographs`, ham index/context çıktıları ve
+yerel kullanıcı dosyaları upload edilmez. Bu CI kendi checkout'undaki sentetik
+örnekleri analiz eder. Ürüne telemetry veya runtime upload eklenmez.
+
+### Bir kez yapılacak NuGet ayarı
+
+[NuGet.org Trusted Publishing](https://www.nuget.org/account/trustedpublishing)
+sayfasında `uozturk` hesabıyla aşağıdaki policy'yi oluşturun:
+
+| Alan | Değer |
+| --- | --- |
+| Policy owner | `uozturk` (paketin sahibi olacak hesap) |
+| Repository owner | `ugurozturk` |
+| Repository | `UO.DotGraphs` |
+| Workflow file | `publish-nuget.yml` — yalnız dosya adı |
+| Environment | Boş; workflow GitHub Environment kullanmıyor |
+| Package glob | `UO.Graphs.Cli` |
+| Scopes | Yeni paket oluşturma ve mevcut pakete yeni sürüm gönderme |
+
+Workflow'daki `user: uozturk` NuGet profil adıdır, e-posta değildir. Kalıcı
+`NUGET_API_KEY` secret'ı oluşturmayın. `id-token: write` yalnız publish job'unda
+açıktır; CI'ın yayın yetkisi yoktur. GitHub Environment eklenirse policy ve
+workflow birlikte güncellenmelidir. İlk paket adı başka hesaba aitse bu policy
+o hesaba ait paketi yayımlama yetkisi vermez.
+
+Resmi kaynaklar: [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing),
+[NuGet/login](https://github.com/NuGet/login),
+[GitHub workflow_run](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+
+### Yeni sürüm çıkarma
+
+1. Policy'yi oluşturun; bu iki workflow'un varsayılan `main` branch'inde bulunmasını
+   sağlayın. Branch adını değiştirirseniz her iki workflow filtresini de değiştirin.
+2. Yeni sürüm için `Directory.Build.props` içindeki `<Version>` değerini elle
+   güncelleyin; değişiklikleri inceleyip `main` branch'ine push/merge edin. Bu, otomatik NuGet
+   yayını için tetiktir; ayrıca tag veya GitHub Release oluşturmak gerekmez.
+3. GitHub Actions'ta önce `build-test-pack`, sonra `publish-nuget` sonucunu izleyin.
+   Bir doğrulama başarısızsa paket yayımlanmaz; assertion/test atlanmaz.
+4. NuGet'te sürüm listelendikten sonra README'deki install/update komutunu kullanın.
+
+Policy eksikliği nedeniyle yalnız yayın işi başarısız olduysa, policy'yi düzelttikten
+sonra aynı `publish-nuget` çalışmasını yeniden çalıştırın. Artifact'ın 14 günlük
+saklama süresi dolmuşsa yeni bir main push/CI çalışması gerekir. Elle yeni CI
+başlatmak publish tetiklemez.
+
+Sürümün tek kaynağı `Directory.Build.props` içindeki `<Version>` değeridir.
+Örneğin `<Version>0.9.0</Version>` bütün CI çalıştırmalarında **0.9.0** üretir;
+çalıştırma numarası sürüme eklenmez. Mevcut doğrulama kararlı `major.minor.patch`
+biçimini ister. Yeni sürüm için değeri elle değiştirin; CI ve varsayılan yerel
+`dotnet pack` aynı tanımlı sürümü kullanır. Yayın işi de CI'ı tetikleyen commit'in
+props dosyasını okur. NuGet'te mevcut sürüm `--skip-duplicate` ile atlanır,
+üzerine yazılmaz; sürüm değiştirilmeden yapılan main push yeni paket sürümü oluşturmaz.
+
+Workflow hazırlığı, canlı GitHub/OIDC/publish doğrulaması değildir. Bu akışın son
+yerel kontrolleri ve yapılmamış canlı adımlar [STATUS](STATUS.md)'ta belirtilir.
+Ubuntu workflow'u Windows/macOS runtime kabulünün yerine geçmez.
 
 ## Gereksinimler ve offline hazırlık
 
@@ -59,7 +136,8 @@ manifest geçici kökteydi; help/query/context başarılıydı. Read smoke repo 
 üretilmiş DB'yi kullandı; bu kurulum için index **NOT RUN** (aynı BuildHost IPC
 sınırı). Kullanıcının global kurulumu/manifesti değiştirilmedi. Global scope kurulumu
 **NOT RUN**. Raw komutlar: `.uographs/phase11-followup/local-manifest/commands.json`.
-Debug yapılandırması gerçekten paketlendi; Release configuration bu tur NOT RUN.
+İlk Faz 11 tesliminde Debug paketlendi; sonraki GitHub/NuGet otomasyonu turunda
+Release build/pack ve kurulu tool smoke da çalıştırıldı (ayrıntılar STATUS'ta).
 SDK'nin ürettiği tool ayarında command name `uographs` ve entry point `uographs.dll`.
 BuildHost-netcore, runtime native SQLite varlıkları ve bağımlı ürün DLL'leri pakette.
 

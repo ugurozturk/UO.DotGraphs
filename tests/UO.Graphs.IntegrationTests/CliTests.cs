@@ -9,6 +9,10 @@ public sealed partial class CliTests : IDisposable
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), "uographs-cli-" + Guid.NewGuid().ToString("N"));
     private static readonly string Root = FindRoot();
+    private static readonly string BuildConfiguration = typeof(CliTests).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyConfigurationAttribute), false)
+        .Cast<System.Reflection.AssemblyConfigurationAttribute>().Single().Configuration;
+    private static string CliAssembly => Path.Combine(Root, "src/UO.Graphs.Cli/bin", BuildConfiguration, "net10.0/uographs.dll");
     private string Database => Path.Combine(directory, "graph.db");
 
     [Fact]
@@ -19,6 +23,7 @@ public sealed partial class CliTests : IDisposable
         Assert.Contains("Reading symbols", indexed.Error);
         using var indexJson = JsonDocument.Parse(indexed.Output);
         Assert.Equal(15, indexJson.RootElement.GetProperty("entityCount").GetInt32());
+        Assert.Equal(UO.Graphs.Core.ProductVersion.Current, indexJson.RootElement.GetProperty("analysis").GetProperty("toolVersion").GetString());
         var analysisId = indexJson.RootElement.GetProperty("analysis").GetProperty("id").GetString();
         var projectPath = Path.Combine(Root, "samples/HelloGraph/HelloGraph.Domain/HelloGraph.Domain.csproj");
         var projectId = Hash(Canonical("project", "HelloGraph.Domain/HelloGraph.Domain.csproj", "net10.0", "Debug"));
@@ -96,6 +101,7 @@ public sealed partial class CliTests : IDisposable
     {
         var help = await Run("--help");
         Assert.Equal(0, help.Code);
+        Assert.StartsWith($"UO.Graphs {UO.Graphs.Core.ProductVersion.Current} —", help.Output);
         Assert.Contains("uographs index", help.Output);
         var doctor = await Run("doctor");
         Assert.Equal(0, doctor.Code);
@@ -152,7 +158,7 @@ public sealed partial class CliTests : IDisposable
     {
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = workingDirectory, RedirectStandardOutput = true,
             RedirectStandardError = true, UseShellExecute = false };
-        foreach (var arg in new[] { "run", "--project", Path.Combine(Root, "src/UO.Graphs.Cli/UO.Graphs.Cli.csproj"), "--no-build", "--no-restore", "--" }.Concat(arguments))
+        foreach (var arg in new[] { "run", "--project", Path.Combine(Root, "src/UO.Graphs.Cli/UO.Graphs.Cli.csproj"), "--configuration", BuildConfiguration, "--no-build", "--no-restore", "--" }.Concat(arguments))
             start.ArgumentList.Add(arg);
         start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         using var process = Process.Start(start)!;

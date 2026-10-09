@@ -7,6 +7,11 @@
     <PackageId>UO.Graphs.Cli</PackageId>
     <Description>Local C# evidence graph CLI; requires a prepared .NET SDK and explicit MSBuild trust.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Authors>UO.Graphs contributors</Authors>
+    <PackageProjectUrl>https://github.com/ugurozturk/UO.DotGraphs</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ugurozturk/UO.DotGraphs</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>roslyn;csharp;code-analysis;graph;cli</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" PrivateAssets="all" />

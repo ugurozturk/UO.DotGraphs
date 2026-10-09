@@ -19,7 +19,7 @@ license, applicable notices and identification of modifications when distributin
 third-party files; no dependency was modified. SQLite is public domain. These terms
 permit inclusion in an MIT product; they do not relicense dependencies as MIT.
 Preserve THIRD-PARTY-NOTICES.txt and the MIT/Apache license texts in any future distribution.
-Tool packaging is not implemented. Phase 2, 8 and 9 fixture dependencies are included; product packages remain unchanged.
+The CLI tool package retains these notices. Phase 2, 8 and 9 fixture dependencies are included in this inventory, not the product package.
 Source contract fixtures carry separate upstream licenses under samples/Phase8/ContractFixtures;
 see docs/MESSAGING.md for their provenance and distinction from package compatibility tests.
 

@@ -3,11 +3,108 @@
 Son güncelleme: **2026-10-09**.
 
 **Faz 11 sağlamlaştırması uygulandı; bütün release kabul kapıları kapatılmadı.**
-Ürün **UO.Graphs 0.9.0**, paket **UO.Graphs.Cli**, komut **uographs**.
+Tanımlı sürüm **UO.Graphs 0.9.0**, paket **UO.Graphs.Cli**, komut **uographs**.
 JSON envelope **4** / SQLite **3** / context-export **1** korunur.
 Yeni ürün analiz alanı, servis veya dependency eklenmedi.
 [Önceki faz](history/PHASE10.md), [release readiness ve kısa kullanım](RELEASE.md),
 [ölçümler](PERFORMANCE.md), [güven sınırı](SECURITY.md).
+
+## GitHub/NuGet yayın otomasyonu — 2026-10-09
+
+Kullanıcının isteğiyle GitHub Actions build/test/pack ve NuGet Trusted Publishing
+eklendi. `main` push başarılıysa `uozturk` hesabıyla otomatik yayınlanacak;
+PR ve manuel CI publish yapmaz. Kalıcı API key yok. NuGet policy alanları ve
+kurulum/yayın adımları [RELEASE](RELEASE.md#github-actions-ve-nuget-trusted-publishing)
+ve [README](../README.md)'dedir. Canlı GitHub/OIDC/NuGet çalıştırması **NOT RUN**;
+workflow oluşturulması NuGet policy'nin oluşturulduğu veya paketin yayımlandığı
+anlamına gelmez. Commit/push/publish yapılmadı.
+
+- `ci.yml`: Ubuntu 24.04, sabit SDK, locked restore, Release build ve standart
+  VSTest, lisans kontrolü, pack ve yerel feed'den kurulan gerçek tool smoke.
+- `publish-nuget.yml`: yalnız ilk taraf başarılı main push CI'ın run-id'sindeki
+  artifact; kimlik/sürüm/commit/SHA-256 tekrar kontrolü; yeniden derleme yok.
+- Kullanıcının düzeltmesiyle sürüm doğrudan `Directory.Build.props` içindeki
+  `<Version>` değeridir; CI çalıştırma numarası eklenmez. Aynı sürüm restore/build/
+  test/pack boyunca korunur. CLI help ve yeni graph `toolVersion` assembly sürümünü okur.
+- Test harness'ler CLI ve contract fixture DLL'lerini test assembly'sinin gerçek
+  Debug/Release yapılandırmasından seçer. Analiz edilen hedefin varsayılan Debug
+  bağlamı değişmedi. Generator fixture referansı açıkça Debug olduğundan CI onu
+  ayrıca Debug derler. Assertion veya test kaldırılmadı.
+- Upload kapsamı nupkg, manifest ve TRX; graph/ham context/yerel evidence yok.
+  Ürün dependency'si, runtime upload/restore veya yeni analiz alanı eklenmedi.
+
+### Sabit sürüm düzeltmesinin doğrulaması
+
+`Directory.Build.props` değiştirilmedi; mevcut `<Version>0.9.0</Version>` aynen
+kullanılır. CI ve publish workflow'larından run-number girdisi kaldırıldı.
+Yeni sürüm için kullanıcı Version değerini elle değiştirir; aynı sürüm NuGet'te
+varsa `--skip-duplicate` ile atlanır. README ve RELEASE buna göre güncellendi.
+
+Yerel macOS ARM64 kontrolleri, `.uographs/static-version/`:
+
+- `python3 -B scripts/test_ci_package.py`: **PASS 9/9**; farklı CI run değerlerinde
+  props sürümünün aynen korunduğu ve eksik/geçersiz sürümün reddedildiği dahil.
+- `python3 -B scripts/verify_ci_package.py --print-version`: **0.9.0**.
+- `dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`:
+  **PASS 21.93 sn**, 0 warning / 0 error; Version override verilmedi.
+- `dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/static-version/packages`:
+  **PASS**, `UO.Graphs.Cli.0.9.0.nupkg`.
+- Paket doğrulayıcı `--version 0.9.0 --commit <HEAD> --write-manifest` ve
+  `--verify-manifest`: **PASS**, SHA-256
+  `5d236ea8e24d83f13480d5dc39e2aface9cbf35fa93c3d8391285f9de643aa3a`.
+- `python3 -B scripts/smoke_package.py .uographs/static-version/packages --version 0.9.0 --evidence .uographs/static-version/smoke`:
+  **PASS**, izole yerel install/help/doctor/trust reddi, yeni DB üzerinde
+  index **8.357 sn / 15 entity**, query/context; help ve graph sürümü **0.9.0**.
+- İki workflow YAML parse ve 11 shell bloğunda `bash -n`; `git diff --check`: **PASS**.
+  Ürün C# kodu değişmediğinden tam .NET suite bu düzeltmede yeniden çalıştırılmadı.
+  GitHub/OIDC/NuGet canlı yayın **NOT RUN**; commit/push/publish yapılmadı.
+
+Bu düzeltmede değişen dosyalar: `ci.yml`, `publish-nuget.yml`,
+`verify_ci_package.py`, `test_ci_package.py`, README, RELEASE ve STATUS.
+Önerilen commit: `fix(ci): use the exact version from Directory.Build.props`
+
+### Önceki yayın otomasyonu kontrolleri
+
+Aşağıdaki 0.9.1 sürümü önceki yerel denemelerde açık komut parametresiyle verildi;
+güncel sürüm kaynağı yukarıdaki props değeridir.
+Yerel doğrulama (macOS ARM64), `.uographs/trusted-publishing/`:
+
+| Komut/kontrol | Sonuç |
+| --- | --- |
+| `dotnet build UO.Graphs.slnx -c Release --no-restore -p:Version=0.9.1 -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, 0 warning / 0 error, ilk build 22.70 sn. |
+| `dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -p:Version=0.9.1 -m:1 -nr:false --logger 'trx;LogFileName=release-unit.trx' --results-directory .uographs/trusted-publishing/vstest` | PASS 55/55, skipped 0, 6 sn. |
+| `dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -p:Version=0.9.1 -m:1 -nr:false --logger 'trx;LogFileName=release-integration.trx' --results-directory .uographs/trusted-publishing/vstest` | PASS 98/98, skipped 0, 11m23s. Son sürüm çıktısı düzeltmesinden önceki binary; bu sırada rebuild/pack yapılmadı. |
+| `dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:Version=0.9.1 -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/trusted-publishing/packages` | PASS, 218 entry; yerel 0.9.1 deneme paketi. |
+| `verify_ci_package.py ... --version 0.9.1 --commit <HEAD> --write-manifest`, ardından `--verify-manifest` | PASS: paket kimliği/sürümü, MIT, repository commit, CLI/BuildHost/native SQLite payload, fixture dışlama ve SHA-256. |
+| `python3 scripts/smoke_package.py .uographs/trusted-publishing/packages --version 0.9.1 --evidence .uographs/trusted-publishing/smoke` | İlk paket PASS: install/help/doctor, trust exit 3, yeni DB'de index 15 entity, query/context. Index 10.070 sn. Son sürüm çıktısı düzeltmesi sonrası tekrar aşağıdadır. |
+| `python3 scripts/test_ci_package.py` / `python3 scripts/test_release_tools.py` | PASS 8/8 / 2/2. Sentetik paket negatifleri gerçek kurulumun yerine kullanılmadı. |
+| `python3 scripts/audit_licenses.py --check` | PASS 143 kilitli paket; mevcut lisans kapanımları korunur. |
+| Temiz kaynak kopyasında CI'ın üç restore hedefi, `--locked-mode -p:Version=0.9.1 -p:NuGetAudit=false -m:1 -nr:false` | PASS; solution, Phase2 fixtures ve Phase3. Yerel cache kontrolü; canlı NuGet vulnerability audit iddiası değil. CI audit'i kapatmaz. |
+| YAML parse, 11 workflow shell bloğunda `bash -n`, Python AST, `git diff --check` | PASS. GitHub Actions runtime veya OIDC kabulü değildir. |
+
+Son sürüm çıktısı değişikliği sonrası, önceki tam suite tamamlandıktan sonra:
+
+| Takip kontrolü | Sonuç |
+| --- | --- |
+| Aynı Release build komutu, son kaynaklar | PASS 8.89 sn, 0 warning / 0 error. |
+| Aynı unit komutu, `final-unit.trx` | PASS 55/55, skipped 0, 7 sn. |
+| Aynı integration komutu; `--filter 'FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses\|FullyQualifiedName~HelpAndDoctorRunWithoutLoadingTarget'`, `final-version-cli.trx` | PASS 2/2, skipped 0, 12 sn; help ve graph sürüm assertion'ları dahil. Tam 98 test son sürüm metni değişikliğinden sonra yeniden çalıştırılmadı. |
+| Aynı pack/verifier komutları, çıktı `final-packages/` | PASS; final manifest SHA-256 `b7c0a48c27fc393af532c31f965791ad19f0b68c6c8e8cfc40683cf95d528f24`. |
+| `python3 scripts/smoke_package.py .uographs/trusted-publishing/final-packages --version 0.9.1 --evidence .uographs/trusted-publishing/final-smoke` | PASS: yerel-only install 0.791 sn; help/graph sürümü 0.9.1; trust reddi; sıfırdan index 8.593 sn / 15 entity; ayrı query/context prosesleri. |
+| Son lisans/diff/yerel Markdown link kontrolü | PASS; 143 paket, eksik yerel link yok. |
+
+Test deneme paketi, henüz commit edilmemiş çalışma ağacından üretildi; yerel
+nuspec commit alanı mevcut HEAD'i gösterir, bu bir yayımlanmış commit/paket değildir.
+GitHub CI temiz checkout'un commit'ini ve aynı çalışmanın paketini doğrular.
+Eski Faz 11 IPC başarısızlıkları aşağıda tarihsel kanıt olarak korunur; bu tur
+izinli yerel koşulda kurulu tool index'i geçti. Linux CI, Windows, fiziksel offline
+ve gerçek NuGet yayın kapıları bu yerel başarıdan çıkarılmaz.
+
+Değişen dosyalar: iki `.github/workflows` dosyası; `verify_ci_package.py`,
+`smoke_package.py`, `test_ci_package.py`; CLI csproj/Program, Core/ProductVersion,
+Roslyn/ProjectIndexer; integration CliTests/Phase6Tests ve unit MessagingTests;
+README, RELEASE, STATUS, DEPENDENCIES ve lisans envanteri scriptinin başlık metni.
+Önerilen commit: `ci: publish verified UO.Graphs tool packages with NuGet trusted publishing`
 
 ## Değişiklikler ve somut kanıt
 
@@ -186,7 +283,8 @@ DB kullanır; bu ayrım açıktır.
   lease alınabildi/bırakıldı (`phase11-followup/prior-lease.json`). Eski PID'ye
   tekrar sinyal gönderilmedi; bu başarısız index koşusu başarı sayılmaz.
 - Copilot E2E önceki fazdan **NOT RUN**. Test edilmeyen CI/OS'a başarı atfedilmez.
-- Git metadata yok; `git status --short` exit 128, Git diff **NOT RUN**.
+- İlk Faz 11 koşusunda Git metadata yoktu; o koşuda Git diff **NOT RUN**.
+  Yayın otomasyonu turunda Git repository ve origin mevcut, diff kontrol edildi.
   AGENTS.md korunur; otomatik commit/push/publish yok.
 - Backlog: izinli izole agent'ta paketli/offline/OS matrisi; güvenilir process-tree
   RSS; 1000-project baseline; metadata zarf büyümesi; SDK/binary hashing ve

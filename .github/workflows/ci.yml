@@ -1,0 +1,74 @@
+name: build-test-pack
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Read package version from Directory.Build.props
+        shell: bash
+        run: |
+          version="$(python3 scripts/verify_ci_package.py --print-version)"
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Package version: $version"
+      - name: Restore locked product and test fixtures
+        shell: bash
+        run: |
+          for project in UO.Graphs.slnx samples/Phase2/Fixtures.slnx samples/Phase3/Semantics.csproj; do
+            dotnet restore "$project" --locked-mode -p:Version="$PACKAGE_VERSION" -m:1 -nr:false
+          done
+      - name: Prepare generator fixture (its analyzer reference explicitly uses Debug)
+        run: dotnet build samples/Phase2/Generator/Generator.csproj -c Debug --no-restore -p:Version="$PACKAGE_VERSION" -m:1 -nr:false -p:UseSharedCompilation=false
+      - name: Build Release
+        run: dotnet build UO.Graphs.slnx -c Release --no-restore -p:Version="$PACKAGE_VERSION" -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+      - name: Test Release binaries
+        shell: bash
+        run: |
+          for suite in UnitTests IntegrationTests; do
+            dotnet test "tests/UO.Graphs.$suite" -c Release --no-build --no-restore \
+              -p:Version="$PACKAGE_VERSION" -m:1 -nr:false \
+              --logger "trx;LogFileName=$suite.trx" --results-directory artifacts/test-results
+          done
+      - name: Check licenses and release tooling
+        run: |
+          python3 scripts/audit_licenses.py --check
+          python3 scripts/test_release_tools.py
+          python3 scripts/test_ci_package.py
+      - name: Pack the tested Release output
+        run: dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:Version="$PACKAGE_VERSION" -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output artifacts/packages
+      - name: Verify package identity and contents
+        run: python3 scripts/verify_ci_package.py artifacts/packages --version "$PACKAGE_VERSION" --commit "$GITHUB_SHA" --write-manifest
+      - name: Install the actual package and index/query/context a real solution
+        run: python3 scripts/smoke_package.py artifacts/packages --version "$PACKAGE_VERSION" --evidence .uographs/ci-package-smoke
+      - name: Upload verified package and test results
+        uses: actions/upload-artifact@v6
+        with:
+          name: packages-and-test-results
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/manifest.json
+            artifacts/test-results/*.trx

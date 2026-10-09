@@ -305,7 +305,7 @@ public sealed class ProjectIndexer
         RelationshipSymbol Endpoint(GraphEntity entity) => new(entity.Id, entity.DocumentationId, entity.QualifiedName,
             contexts.FirstOrDefault(c => c.Id == entity.ProjectId)?.AssemblyName ?? "", entity.ProjectId, entity.Id);
         RelationshipSymbol Link(RelationshipSymbol symbol) => symbol with { EntityId = entities.ContainsKey(symbol.Id) ? symbol.Id : null };
-        return new(new(analysisId, DateTimeOffset.UtcNow, input, "0.9.0",
+        return new(new(analysisId, DateTimeOffset.UtcNow, input, ProductVersion.Current,
             typeof(Compilation).Assembly.GetName().Version!.ToString(), partial ? "partial" : "completeWithinDeclaredScope", "notChecked",
             ["Phase 9: ABP/EF Core/Refit static declarations; conventional exposure, effective models, remote service identities and runtime configuration are partial/unresolved. UO.Mediator/MediatR/MassTransit bound messaging contracts; candidates are inferred, runtime registration/topology/order unresolved and external consumers outside scope. See docs/MESSAGING.md.",
              "Phase 7: Microsoft DI/ASP.NET Core static declarations; runtime activation, container selection/order, scanning, dynamic registration, MVC conventions and arbitrary route/handler data flow are not proven. See docs/FRAMEWORKS.md.",

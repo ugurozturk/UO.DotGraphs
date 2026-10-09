@@ -132,7 +132,7 @@ public sealed partial class CliTests
         var original = await IndexPath(input, "--framework", "net10.0");
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = Root, RedirectStandardOutput = true,
             RedirectStandardError = true, UseShellExecute = false };
-        foreach (var arg in new[] { Path.Combine(Root, "src/UO.Graphs.Cli/bin/Debug/net10.0/uographs.dll"), "index", input,
+        foreach (var arg in new[] { CliAssembly, "index", input,
             "--full", "--trust-project", "--framework", "net10.0", "--db", Database }) start.ArgumentList.Add(arg);
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
@@ -165,7 +165,7 @@ public sealed partial class CliTests
             "public class Large { " + string.Join(" ", Enumerable.Range(0, 10000).Select(i => "public int Field" + i + ";")) + " }");
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = Root, RedirectStandardOutput = true,
             RedirectStandardError = true, UseShellExecute = false };
-        foreach (var arg in new[] { Path.Combine(Root, "src/UO.Graphs.Cli/bin/Debug/net10.0/uographs.dll"), "index", input,
+        foreach (var arg in new[] { CliAssembly, "index", input,
             "--full", "--trust-project", "--framework", "net10.0", "--db", Database }) start.ArgumentList.Add(arg);
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();

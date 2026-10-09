@@ -1,0 +1,67 @@
+name: publish-nuget
+
+on:
+  workflow_run:
+    workflows: [build-test-pack]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'ugurozturk/UO.DotGraphs' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Download the exact successful CI artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: packages-and-test-results
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify package, source commit and SHA-256 before authentication
+        shell: bash
+        run: |
+          version="$(python3 scripts/verify_ci_package.py --print-version)"
+          python3 scripts/verify_ci_package.py artifacts/packages --version "$version" --commit "$SOURCE_COMMIT" --verify-manifest
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Authenticate with NuGet Trusted Publishing
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: uozturk
+      - name: Publish the verified package without rebuilding
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          test -n "$NUGET_API_KEY"
+          dotnet nuget push "artifacts/packages/UO.Graphs.Cli.$PACKAGE_VERSION.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" --skip-duplicate

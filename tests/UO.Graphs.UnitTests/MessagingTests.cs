@@ -155,11 +155,14 @@ public sealed class MessagingTests
     }
     private static async Task<Result> Analyze(string source, bool contractFixture = false, MetadataReference[]? extra = null)
     {
+        var configuration = typeof(MessagingTests).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyConfigurationAttribute), false)
+            .Cast<System.Reflection.AssemblyConfigurationAttribute>().Single().Configuration;
         var references = Platform().ToList();
         references.Add(MetadataReference.CreateFromFile(Path.Combine(Cache, "uo.mediator.shared/2.4.2/lib/net10.0/UO.Mediator.Shared.dll")));
         references.Add(MetadataReference.CreateFromFile(Path.Combine(Cache, "mediatr.contracts/2.0.1/lib/netstandard2.0/MediatR.Contracts.dll")));
         foreach (var (folder, file, package) in new[] { ("MediatR", "MediatR.dll", "mediatr/12.4.1/lib/net6.0/MediatR.dll"), ("MassTransit", "MassTransit.Abstractions.dll", "masstransit.abstractions/8.3.6/lib/net9.0/MassTransit.Abstractions.dll") })
-            references.Add(MetadataReference.CreateFromFile(contractFixture ? Path.Combine(Root, "samples/Phase8/ContractFixtures", folder, "bin/Debug/net10.0", file) : Path.Combine(Cache, package)));
+            references.Add(MetadataReference.CreateFromFile(contractFixture ? Path.Combine(Root, "samples/Phase8/ContractFixtures", folder, "bin", configuration, "net10.0", file) : Path.Combine(Cache, package)));
         references.AddRange(extra ?? []);
         var trees = new[] { CSharpSyntaxTree.ParseText(source, path: "/fixture/Flows.cs"), CSharpSyntaxTree.ParseText("global using System; global using System.Threading; global using System.Threading.Tasks;", path: "/fixture/Usings.cs") };
         var compilation = CSharpCompilation.Create("MessagingFixture", trees, references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
