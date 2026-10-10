@@ -36,10 +36,13 @@ public sealed partial class GraphStore
         private readonly Dictionary<string, (RelationshipOccurrence[] Items, bool Truncated)> evidence = new(StringComparer.Ordinal);
         private int examined;
         private RelationshipSymbol? resolvedStart, resolvedTarget;
+        private DirectQueryPage? page;
         private sealed record Walk(string Id, int Distance, Walk? Previous = null, GraphRelationship? Edge = null);
 
         public QueryResult Run()
         {
+            if (options.Selection?.Snapshot is { } expected && expected != analysis.Id)
+                throw new GraphException(2, "Compact page snapshot mismatch; restart the query against the selected snapshot.");
             if (command == "find")
             {
                 var matches = Search(value, exact: false, options.Limit + 1);
@@ -49,6 +52,7 @@ public sealed partial class GraphStore
             var start = Resolve(value);
             if (start.Failure is { } failure) return failure;
             resolvedStart = Item(new(start.Id!, 0)).Symbol;
+            if (options.Selection is not null) return Direct(start.Id!);
             if (command == "symbol") return Finish([Item(new(start.Id!, 0))], "ok");
             string? destination = null;
             if (command == "path")
@@ -111,6 +115,90 @@ public sealed partial class GraphStore
                     return Finish([], reasons.Count > 0 ? "boundedSearchIncomplete" : "notFound");
                 }
                 return Finish(results.Select(Item).ToArray(), "ok");
+            }
+        }
+
+        private QueryResult Direct(string root)
+        {
+            var selection = options.Selection!;
+            var cursorScope = GraphIdentity.Hash(GraphIdentity.Canonical(analysis.Id, root, command,
+                options.Direction.ToString(), string.Join(",", options.EdgeTypes), selection.Calls, options.IncludeInferred.ToString()));
+            var after = "";
+            if (selection.After is { } cursor)
+            {
+                var parts = cursor.Split('.');
+                if (parts.Length != 2 || parts[1] != cursorScope)
+                    throw new GraphException(2, "Compact cursor does not match snapshot, root or query policy; restart the query.");
+                after = parts[0];
+            }
+            var direction = options.Direction switch
+            {
+                TraversalDirection.Outgoing => "source_id = $root",
+                TraversalDirection.Incoming => "target_id = $root",
+                _ => "(source_id = $root OR target_id = $root)"
+            };
+            var types = string.Join(",", options.EdgeTypes.Select((_, i) => "$kind" + i));
+            var scope = $"{direction} AND kind IN ({types}) AND confidence IN ('exact', 'unresolved', $confidence)";
+            // Match the formal accessor identity emitted from Roslyn MethodKind, not a display/name heuristic.
+            const string property = "(kind = 'CALLS' AND (json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertyGet' OR json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertySet'))";
+            var filter = selection.Calls switch
+            {
+                "exclude-properties" => $"NOT COALESCE({property}, 0)",
+                "only-properties" => $"COALESCE({property}, 0)",
+                _ => "1"
+            };
+            using var counts = Sql($"SELECT count(*), COALESCE(sum(CASE WHEN {filter} THEN 1 ELSE 0 END),0), COALESCE(sum(CASE WHEN {filter} AND id <= $after THEN 1 ELSE 0 END),0) FROM relationships WHERE {scope}");
+            int total, eligible, before;
+            using (var reader = counts.ExecuteReader())
+            {
+                reader.Read(); total = reader.GetInt32(0); eligible = reader.GetInt32(1); before = reader.GetInt32(2);
+            }
+            if (after.Length > 0)
+            {
+                using var exists = Sql($"SELECT count(*) FROM relationships WHERE {scope} AND {filter} AND id = $after");
+                if (Convert.ToInt32(exists.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) != 1)
+                    throw new GraphException(2, "Compact cursor relationship is absent from this selection.");
+            }
+            var edges = new List<GraphRelationship>();
+            using (var sql = Sql($"SELECT id, source_id, target_id, kind, confidence, json FROM relationships WHERE {scope} AND {filter} AND id > $after ORDER BY id LIMIT $limit"))
+            using (var reader = sql.ExecuteReader())
+                while (reader.Read())
+                {
+                    var edge = Read<GraphRelationship>(reader.GetString(5));
+                    if (edge.Source is null || edge.Id != reader.GetString(0) || edge.Source.Id != reader.GetString(1) ||
+                        edge.Target?.Id != (reader.IsDBNull(2) ? null : reader.GetString(2)) ||
+                        edge.Kind.ToString() != reader.GetString(3) || edge.Confidence.ToString().ToLowerInvariant() != reader.GetString(4) ||
+                        (edge.Target is null) != (edge.Confidence == Confidence.Unresolved))
+                        throw new GraphException(6, "Inconsistent relationship record in database.");
+                    edges.Add(edge);
+                }
+            examined = edges.Count;
+            var items = new List<QueryItem>();
+            foreach (var edge in edges)
+            {
+                var reversed = edge.Source.Id != root;
+                var next = reversed ? edge.Source.Id : edge.Target?.Id;
+                var sites = Evidence(edge.Id);
+                using var count = Command("SELECT count(*) FROM occurrences WHERE relationship_id = $id");
+                count.Parameters.AddWithValue("$id", edge.Id);
+                var step = new QueryStep(root, next, reversed, edge, sites.Items, sites.Truncated)
+                { EvidenceTotal = Convert.ToInt32(count.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) };
+                var node = Item(new(next ?? root, 0));
+                items.Add(node with { Distance = 1, Path = [step] });
+            }
+            if (eligible > before + items.Count) reasons.Add(options.MaxEdges < options.Limit ? "maxEdges" : "limit");
+            page = new(eligible, total - eligible, before, items.Count, selection.Calls, cursorScope);
+            return Finish(items.ToArray(), "ok");
+
+            SqliteCommand Sql(string text)
+            {
+                var sql = Command(text);
+                sql.Parameters.AddWithValue("$root", root);
+                sql.Parameters.AddWithValue("$after", after);
+                sql.Parameters.AddWithValue("$confidence", options.IncludeInferred ? "inferred" : "exact");
+                sql.Parameters.AddWithValue("$limit", Math.Min(options.Limit, options.MaxEdges));
+                for (var i = 0; i < options.EdgeTypes.Length; i++) sql.Parameters.AddWithValue("$kind" + i, options.EdgeTypes[i].ToString());
+                return sql;
             }
         }
 
@@ -223,7 +311,7 @@ public sealed partial class GraphStore
             return new(new(GraphJson.QueryContractVersion, analysis.Id, analysis,
                 new(analysis.Coverage, analysis.Limitations), analysis.Freshness, reasons.Count > 0, items,
                 diagnostics.ToArray(), "query." + command, target is null ? [value] : [value, target], options,
-                new(options.Depth, options.Limit, options.MaxEdges, options.EvidenceLimit, items.Length, examined, reasons.ToArray()), outcome) { ResolvedStart = resolvedStart, ResolvedTarget = resolvedTarget }, exitCode);
+                new(options.Depth, options.Limit, options.MaxEdges, options.EvidenceLimit, items.Length, examined, reasons.ToArray()), outcome) { ResolvedStart = resolvedStart, ResolvedTarget = resolvedTarget, Page = page }, exitCode);
         }
 
         private SqliteCommand Command(string text)

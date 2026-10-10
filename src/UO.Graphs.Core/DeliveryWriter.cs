@@ -75,6 +75,11 @@ public static class DeliveryWriter
             var output = SerializeCounted(document);
             if (Characters(output) <= graph.Options.MaxChars) return new(output, graph.ExitCode);
             reasons.Add("maxChars");
+            // An explicit source request protects the verified excerpt before optional neighbors.
+            // Source/hash status and whole relationship records still survive or are removed together.
+            if (graph.Options.IncludeSource &&
+                (RemoveRecords(document, "nearby", Characters(output) - graph.Options.MaxChars) ||
+                 RemoveRecords(document, "relationships", Characters(output) - graph.Options.MaxChars))) continue;
             // Preserve failed freshness statuses; only optional source text is expendable.
             var snippet = document["snippets"]!.AsArray().LastOrDefault(n => n?["text"] is not null);
             if (snippet is not null) { snippet["text"] = null; snippet["truncated"] = true; continue; }

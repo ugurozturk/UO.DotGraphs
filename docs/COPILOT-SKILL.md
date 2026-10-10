@@ -1,6 +1,6 @@
 # VS Code GitHub Copilot skill
 
-The skill is a terminal consumer of the independent **uographs 0.11.0** CLI. It adds
+The skill is a terminal consumer of the independent **uographs 0.12.0** CLI. It adds
 no MCP server, hosted service, API key, telemetry, LLM dependency, or runtime
 download. Tool packaging is available; see [RELEASE](RELEASE.md). Query/status JSON 6, index/doctor 4, SQLite 3 and context/export 1
 are the supported contracts. Full details do not restore the old v4 JSON shape.
@@ -66,7 +66,7 @@ repository skill. Both use the same instructions and CLI reference. Existing
 standalone skills are not removed; preserve customizations and review duplicates.
 Each target repository requires its own prepared index and explicit scope.
 
-The skill targets CLI **0.11.0** and query/status **v6**. Query/status default to
+The skill targets CLI **0.12.0** and query/status **v6**. Query/status default to
 a 12,000 Unicode-scalar summary including the final LF. An exact ID can go
 directly to the needed semantic query; a simple definition lookup can use `rg`
 or a small find when uographs is requested. Help, doctor, status, freshness and
@@ -191,3 +191,9 @@ PASS/FAIL/NOT RUN without secrets.
 
 Documenting this matrix does not mean it was executed in Copilot. The current E2E
 gate remains open even though CLI workflows and package publication have succeeded.
+
+Compact query v1, explicit accessor filters, snapshot-bound one-hop continuation,
+and the actual CLI examples are described in [AI output](AI-OUTPUT.md). Standard
+query/status v6 remains the default. The skill recommends source/test reads for
+workflow understanding and scales its report to the task; no command chain or
+automatic budget increase is required.

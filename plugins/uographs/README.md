@@ -83,7 +83,7 @@ of an installation route does not establish live VS Code/Copilot acceptance.
 
 Existing standalone skills are not removed; same-named copies may both appear.
 
-The skill targets CLI **0.11.0** and query/status **v6**. Query/status default to
+The skill targets CLI **0.12.0** and standard query/status **v6**, with opt-in compact query **v1**. Query/status default to
 a 12,000 Unicode-scalar summary including the final LF. An exact ID can go
 directly to the needed semantic query; a simple definition lookup can use `rg`
 or a small find when uographs is requested. Help, doctor, status, freshness and
@@ -98,6 +98,6 @@ restore or indexing. Project evaluation requires explicit `--trust-project`.
 Local graph storage does not make the agent offline: content passed to it remains
 subject to your organization's AI data policy.
 
-The plugin's version is 0.3.0 and is maintained independently of the
+The plugin's version is 0.4.0 and is maintained independently of the
 CLI's NuGet version. The skill and CLI reference are copied byte-for-byte from
 both standalone agent templates, with parity checked by repository tests.

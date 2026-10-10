@@ -1,6 +1,6 @@
 # Context and export contract
 
-Current source: **0.11.0**; delivery `formatVersion: 1`, query/status contract 6, index/doctor 4,
+Current source: **0.12.0**; delivery `formatVersion: 1`, query/status contract 6, index/doctor 4,
 SQLite schema 3. Each command reads one snapshot in a read-only transaction,
 without MSBuild, restore, LLMs, embeddings, remote services, or renderers.
 Legacy SQLite schemas 1/2 require explicit re-indexing (exit 4).
@@ -167,3 +167,9 @@ that fixture/task measurement does not imply repository-wide or token savings.
 Historical values are in [Phase 5](history/PHASE5.md); current results are in
 [STATUS](STATUS.md). Use [safe export](SECURITY.md#export-and-skill-installation)
 when writing new files.
+
+With 0.12, an explicit `--include-source` request protects verified snippet text
+until optional nearby nodes and relationships have been removed. The source/hash
+status always remains, even if the text ultimately cannot fit. Use a depth-0
+context or authorized source read for a focused excerpt. This does not establish
+global freshness or replace reading the complete method when needed.

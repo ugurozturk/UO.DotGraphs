@@ -40,6 +40,7 @@ def main():
     schema=json.loads(SCHEMA.read_text())
     cli=['dotnet',str(args.cli)]
     commands=[['doctor'],['status','--db',str(args.db)],['query','find','Greet','--limit','1','--db',str(args.db)],
+              ['query','callees',args.symbol,'--view','compact','--db',str(args.db)],
               ['context',args.symbol,'--max-chars','50000','--db',str(args.db)],
               ['export','--format','json','--max-nodes','2','--limit','1','--db',str(args.db)]]
     count=0
@@ -51,7 +52,7 @@ def main():
         assert matches(document,schema),argv
         invalid=copy.deepcopy(document)
         if 'metadata' in invalid: invalid['metadata']['formatVersion']=999
-        else: invalid[next(k for k in ['contractVersion','schemaVersion','formatVersion'] if k in invalid)]=999
+        else: invalid[next(k for k in ['compactVersion','contractVersion','schemaVersion','formatVersion'] if k in invalid)]=999
         assert not matches(invalid,schema)
         count+=1
     raw=args.index_raw.read_text();document=json.loads(raw[raw.index('{'):])

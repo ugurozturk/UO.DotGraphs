@@ -9,7 +9,7 @@ service, API key, or telemetry. It never automatically restores or downloads
 project dependencies. Indexing requires explicit permission to evaluate the
 project with MSBuild through `--trust-project`.
 
-Source version: **0.11.0**. Package: **UO.Graphs.Cli**. Query/status JSON: **6**;
+Source version: **0.12.0**. Package: **UO.Graphs.Cli**. Standard query/status JSON: **6**; opt-in compact query: **1**;
 SQLite schema: **3**; context/export format: **1**; declaration identity: **2**.
 Validation is recorded per version and platform in [verified status](docs/STATUS.md).
 Full release acceptance remains incomplete, including Windows, physical offline
@@ -33,10 +33,10 @@ does not establish runtime activation, message delivery, or HTTP routing.
 
 As checked on **2026-10-10**, the latest version listed in the
 [NuGet version index](https://api.nuget.org/v3-flatcontainer/uo.graphs.cli/index.json)
-is **0.10.0**. This README describes **0.11.0 source**; the skill in this checkout
-requires CLI 0.11.0 / query-status v6. The published 0.10.0 tool uses v5 and is
+is **0.10.0**. This README describes **0.12.0 source**; the skill in this checkout
+requires CLI 0.12.0 / query-status v6. The published 0.10.0 tool uses v5 and is
 not compatible with that skill. Use [Build from source](#build-from-source) for
-0.11.0; its publication is not claimed here.
+0.12.0; its publication is not claimed here.
 
 A .NET 10 runtime is required to run the tool. Indexing also requires the target's
 selected SDK, reference packs, and previously restored assets.
@@ -125,8 +125,21 @@ uses v6 and respects query traversal/result/evidence limits; it cannot be combin
 with `--max-chars`. If the minimum envelope and an indivisible result cannot fit,
 the command returns exit 2 with empty stdout and reports the required budget.
 
-Existing schema 3 indexes need no rebuild for 0.11.0. Consumers of v5 must account
+Existing schema 3 indexes need no rebuild for 0.12.0. Consumers of v5 must account
 for metadata sampling; see [0.11 migration](docs/MIGRATION-0.11.md).
+
+For workflow review, read the short source body and relevant tests, then request
+only the graph links you need:
+
+```sh
+uographs query callees '<symbol-id>' --view compact --calls exclude-properties --evidence-limit 2 --max-chars 12000
+```
+
+Compact v1 interns symbols and evidence, preserves full IDs, and explicitly filters
+property accessors (including custom bodies). One-hop queries provide snapshot-bound
+continuations instead of requiring a larger budget. Use `--calls only-properties`
+for the complementary inspection. The standard v6 view is unchanged. See the
+[compact contract, actual examples and measurements](docs/AI-OUTPUT.md).
 
 ## Context and export
 
@@ -277,7 +290,7 @@ is appended. Existing NuGet versions are skipped. See
 [release setup](docs/RELEASE.md#github-actions-and-nuget-trusted-publishing).
 
 The [shared agent plugin](plugins/uographs/README.md), version **0.3.0**, supports
-GitHub Copilot and Codex and requires a separately prepared **CLI 0.11.0 / v6**.
+GitHub Copilot and Codex and requires a separately prepared **CLI 0.12.0 / v6**.
 The NuGet 0.10.0 installation above does not satisfy this requirement. With the
 compatible CLI available, install the plugin once through Copilot CLI:
 

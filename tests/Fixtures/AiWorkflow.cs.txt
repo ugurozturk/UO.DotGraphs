@@ -1,0 +1,96 @@
+namespace AiWorkflow;
+public interface IGuard { void CheckEnabledAsync(); }
+public class Workflow
+{
+    public int P00 { get; set; }
+    public int P01 { get; set; }
+    public int P02 { get; set; }
+    public int P03 { get; set; }
+    public int P04 { get; set; }
+    public int P05 { get; set; }
+    public int P06 { get; set; }
+    public int P07 { get; set; }
+    public int P08 { get; set; }
+    public int P09 { get; set; }
+    public int P10 { get; set; }
+    public int P11 { get; set; }
+    public int P12 { get; set; }
+    public int P13 { get; set; }
+    public int P14 { get; set; }
+    public int P15 { get; set; }
+    public int P16 { get; set; }
+    public int P17 { get; set; }
+    public int P18 { get; set; }
+    public int P19 { get; set; }
+    public int P20 { get; set; }
+    public int P21 { get; set; }
+    public int P22 { get; set; }
+    public int P23 { get; set; }
+    public int P24 { get; set; }
+    public int P25 { get; set; }
+    public int P26 { get; set; }
+    public int P27 { get; set; }
+    public int P28 { get; set; }
+    public int P29 { get; set; }
+    // Unicode evidence: Türkçe 😀; getter bodies must not be silently dismissed.
+    public int Custom { get { EnsureCanChange(); return 1; } set { EnsureCanChange(); } }
+    public void Run(IGuard guard)
+    {
+        P00 = P01;
+        P01 = P02;
+        P02 = P03;
+        P03 = P04;
+        P04 = P05;
+        P05 = P06;
+        P06 = P07;
+        P07 = P08;
+        P08 = P09;
+        P09 = P10;
+        P10 = P11;
+        P11 = P12;
+        P12 = P13;
+        P13 = P14;
+        P14 = P15;
+        P15 = P16;
+        P16 = P17;
+        P17 = P18;
+        P18 = P19;
+        P19 = P20;
+        P20 = P21;
+        P21 = P22;
+        P22 = P23;
+        P23 = P24;
+        P24 = P25;
+        P25 = P26;
+        P26 = P27;
+        P27 = P28;
+        P28 = P29;
+        P29 = P00;
+        Custom = Custom;
+        guard.CheckEnabledAsync();
+        EnsureCanChange();
+        Validate();
+        InsertAsync();
+        RecalculateTotalsAsync();
+        ApplyPostApprovalFinancialChangeAsync();
+        AddChangeLogAsync();
+    }
+    public void EnsureCanChange() { }
+    public void Validate() { }
+    public void InsertAsync() { }
+    public void RecalculateTotalsAsync() { }
+    public void ApplyPostApprovalFinancialChangeAsync() { }
+    public void AddChangeLogAsync() { }
+    public void Bindings()
+    {
+        Overload(1); Overload("Türkçe 😀");
+        Generic<int>(1); Generic<string>("x");
+        Left.Same(); Right.Same();
+    }
+    public void Overload(int value) { }
+    public void Overload(string value) { }
+    public void Generic<T>(T value) { }
+    public void Unknown(System.Action action) { action(); }
+}
+public static class Left { public static void Same() { } }
+public static class Right { public static void Same() { } }

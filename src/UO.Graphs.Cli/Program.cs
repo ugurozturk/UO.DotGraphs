@@ -37,6 +37,14 @@ internal static class Cli
         Summary samples metadata before pruning whole results; omissions are explicit.
         Full includes all analysis metadata/diagnostics once; incompatible with --max-chars.
         Query/status contract 6; index/doctor 4; context/export 1; SQLite schema 3.
+        Query --view standard|compact (default standard). Compact contract 1 uses
+        shared symbol/relationship/evidence/file tables with document-local references.
+        Compact depth-1 callees/callers/dependencies page whole relationships (including
+        unresolved observations), ordered by relationship ID, not importance/execution.
+        --calls all|exclude-properties|only-properties is an explicit semantic filter.
+        Continue with --after <cursor> --snapshot <id> and the same query policy.
+        Counts include eligible, filtered, budget omissions and remaining relationships.
+        Other compact queries retain standard traversal/ambiguity semantics.
         Query options: --direction outgoing|incoming|both --edge-types CALLS,USES_TYPE,...
                        --depth <0..100> --limit <1..10000> --include-inferred
                        --max-edges <1..1000000> --evidence-limit <1..1000>
@@ -155,6 +163,9 @@ internal static class Cli
         string? symbol = null;
         var format = "json";
         var details = "summary";
+        var view = "standard";
+        var calls = "all";
+        string? after = null, snapshot = null;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Length; i++)
         {
@@ -164,6 +175,10 @@ internal static class Cli
             if (!seen.Add(arg)) throw new GraphException(2, $"Duplicate option: {arg}");
             switch (arg)
             {
+                case "--view": view = Value(); break;
+                case "--calls": calls = Value(); break;
+                case "--after": after = Value(); break;
+                case "--snapshot": snapshot = Value(); break;
                 case "--details": details = Value(); break;
                 case "--full": full = true; break;
                 case "--incremental": break;
@@ -243,7 +258,9 @@ internal static class Cli
         var isReadOutput = isQuery || name == "status";
         if (seen.Contains("--details") && !isReadOutput || maxChars is not null && !isReadOutput && name != "context")
             throw new GraphException(2, "--details requires query/status; --max-chars requires query/status/context.");
-        ReadOutputOptions? readOutput = isReadOutput ? new(details, maxChars) : null;
+        if (seen.Contains("--view") && !isQuery || seen.Any(s => s is "--calls" or "--after" or "--snapshot") && (!isQuery || view != "compact"))
+            throw new GraphException(2, "--view requires query; --calls/--after/--snapshot require --view compact.");
+        ReadOutputOptions? readOutput = isReadOutput ? new(details, maxChars, view) : null;
         readOutput?.Validate();
         if (name == "export" && depth is not null && symbol is null)
             throw new GraphException(2, "Export --depth requires --symbol; full export has no traversal root.");
@@ -260,6 +277,9 @@ internal static class Cli
         queryOptions = queryOptions with { Direction = direction ?? queryOptions.Direction, EdgeTypes = edgeTypes ?? queryOptions.EdgeTypes,
             Depth = depth ?? queryOptions.Depth, Limit = limit ?? queryOptions.Limit, IncludeInferred = includeInferred,
             MaxEdges = maxEdges ?? queryOptions.MaxEdges, EvidenceLimit = evidenceLimit ?? queryOptions.EvidenceLimit };
+        if (view == "compact" && name is "callees" or "callers" or "dependencies" && queryOptions.Depth == 1 ||
+            seen.Any(s => s is "--calls" or "--after" or "--snapshot"))
+            queryOptions = queryOptions with { Selection = new(calls, after, snapshot) };
         if (isQuery) queryOptions.Validate(name);
         DeliveryOptions? delivery = null;
         if (isDelivery)

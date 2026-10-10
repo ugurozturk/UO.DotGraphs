@@ -3,11 +3,117 @@
 Last updated: **2026-10-10**.
 
 **Phase 11 hardening is implemented; full release acceptance remains incomplete.**
-Source **UO.Graphs 0.11.0**, package **UO.Graphs.Cli**, command **uographs**.
-Query/status JSON **6**, index/doctor **4**, SQLite **3**, context/export **1**, declaration identity **2**.
+Source **UO.Graphs 0.12.0**, package **UO.Graphs.Cli**, command **uographs**.
+Standard query/status JSON **6**, opt-in compact query **1**, index/doctor **4**, SQLite **3**, context/export **1**, declaration identity **2**.
 No new product analysis domain, service, or runtime dependency was added by hardening.
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
+
+## AI query output revision — 2026-10-10
+
+Implemented CLI **0.12.0**, opt-in compact query **v1**, plugin **0.4.0**.
+Standard query/status **v6**, SQLite **v3**, index/doctor **v4** and context/export
+**v1** remain compatible. No storage migration, extractor/dependency change, automatic restore/download or
+new generator-enabling behavior, application server, commit/push/publish or
+real-project re-index. The measurement fixture keeps generators disabled; existing
+regression tests retain their explicitly defined generator settings. [Contract, root cause, actual stdout and measurements](AI-OUTPUT.md).
+
+Root cause verified: relationship-ID BFS/limit ordering followed by whole-result
+tail pruning, plus repeated symbol/entity/endpoints/occurrences. Compact output
+interns records without shortening IDs; one-hop relationship pages support explicit
+Roslyn accessor filters and snapshot/query-policy-bound continuations. Confidence,
+bound target/runtime uncertainty, evidence ranges/hashes, freshness/coverage and
+separate evidence/metadata truncation remain. Canonical/parent/declaration/name
+fields are optional through standard symbol reads. No grouping/business ranking.
+Explicit include-source context now protects snippets before optional neighbors.
+
+Same fixture/snapshot, depth 1 / limit 100 / max-edges 500 / evidence-limit 2:
+standard large **238,374 chars, 69 edges/69 occurrences**, compact large **59,538,
+same 69/69**. Standard 12,000 budget retains two accessors; compact explicit
+exclude-properties retains **all seven predefined critical calls and seven
+occurrences in 10,288 chars**, reporting 62 filtered accessor relationships.
+Actual CLI stdout is tracked in `docs/examples/compact-workflow.json` and the
+fixture source in `tests/Fixtures/AiWorkflow.cs.txt`. Interface, overload, generic,
+same-name, custom accessor, Unicode, ambiguity, empty result, evidence truncation,
+missing/corrupt evidence, deterministic repeat, multi-page completeness, cursor
+policy/snapshot rejection, mediator exact/inferred/unresolved and snippets are tested.
+
+Read-only IslemKaydi snapshot **003729cdc2294eb88cf5da2d8b67b651**, producer **0.9.0**:
+standard **163,699 chars / 40 edges / 48 occurrences** versus compact **46,315 /
+same 40/48**, at a 1,000,000 budget (the 200,000-budget baseline is 163,698).
+At 12,000, standard retains two accessor targets; compact method pages retain
+7+7 targets in **11,544 / 11,828 chars**, with **8+9 occurrences**. All seven requested
+critical calls are present across those pages; EnsureCanChange is on page 2.
+26 accessor edges are explicitly filtered. Database SHA-256 is unchanged.
+Current status is **stale / partial**, net10.0/Debug, generators off; nine selected
+source files matched hashes, not global freshness. Short handler and application
+test source review corroborated totals, validation and financial-change intent;
+application tests were not run. This is output adequacy evidence, not application
+acceptance, token measurement, a general benchmark or a two-agent comparison.
+
+Measurements used three runs per representation on macOS ARM64, SDK 10.0.201,
+runtime 10.0.5; timer includes process startup, read, serialization and pipe drain.
+Fixture row ranges **0.133–0.176 s**; real first-page/full row ranges **0.131–0.172 s**;
+real page 2 **0.141 s** in one run. Cache/concurrent load were uncontrolled.
+Raw argv/stdout/stderr/measurements/TRX/private outputs: `.uographs/compact-output/`.
+No private application output is tracked. See AI-OUTPUT for per-row values.
+
+| Verification | Result |
+| --- | --- |
+| Release build, no restore | PASS, final **2.97 s**, zero warnings/errors |
+| Unit tests | PASS **55/55**, 7 s |
+| Output/context/metadata/semantic/consumer regression | PASS **57/57**, 87 s |
+| Final rebuilt compact suite | PASS **10/10**, **28 s**, compact-verified.trx; includes explicit property-filter unresolved label and corruption checks |
+| Skill/template/plugin and real subprocess consumers | PASS **17/17**, 18.949 s |
+| Envelope validator | PASS **7** actual envelopes and **7** incompatible-version negatives; schema-keyword subset only |
+| Isolated fixture CLI index | PASS **163 entities / 403 relationships / 516 occurrences**; no generators or restore; fingerprint 2429 ms, analysis 3728 ms |
+| Read measurements | PASS: repeat bytes, full edge/evidence ID equality, two-page method completeness, unchanged database hashes |
+| Final artifact checks | PASS: eight final-binary outputs equal measured bytes and validate; actual example byte parity; five skill copies equal; 102 local Markdown links; git diff --check |
+| License audit | PASS **143** unchanged locked dependencies |
+| Generic skill quick_validate.py | Blocked at import: PyYAML unavailable; no download. Repository's stricter standalone frontmatter/parity/consumer validator passed |
+| Full integration suite, Windows/Linux, package installation/publish, agent E2E, application tests | **NOT RUN** for this change; focused macOS validation only |
+
+Initial compact tests passed 8/8; the first broader run passed 56 and failed one
+new mediator assertion because the real graph correctly contained an unresolved
+POSSIBLE_TARGET alongside inferred candidates. The test now requires both and
+verifies source evidence; the final 57/57 passed. The initial skill consumer had
+v6-only parsing and unmapped new placeholders; it was updated for explicit compact
+v1 and actual negative cursor handling, then passed 17/17. No existing test/assertion
+was removed or weakened. Two restricted standalone fixture index attempts failed
+with projectLoad timeouts; the explicitly permitted direct invocation passed.
+A later test-project compilation process exited with csc code 139; the unchanged
+source rebuilt successfully in 2.97 s. A test invocation using the previous test
+binary after that compiler failure is retained as interim evidence only; final
+`compact-verified.trx` uses the successful rebuilt tests. These failures are not
+folded into the passing evidence. Repo `.agents` parity
+updates used the permitted write path; installed plugin caches were not modified.
+
+Representative commands actually run (full argv also recorded with measurements):
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit.trx' --results-directory .uographs/compact-output
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Compact|FullyQualifiedName~BoundedOutput|FullyQualifiedName~MetadataBudget|FullyQualifiedName~Context|FullyQualifiedName~SourceIsOptIn|FullyQualifiedName~SemanticEvidenceSurvives|FullyQualifiedName~RepeatedCliQueries|FullyQualifiedName~ActualRoslynGraphQueries|FullyQualifiedName~AllCommandsEmitVersioned' --logger 'trx;LogFileName=regression-final.trx' --results-directory .uographs/compact-output
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Compact' --logger 'trx;LogFileName=compact-verified.trx' --results-directory .uographs/compact-output
+dotnet src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll index /private/tmp/uographs-ai-output-1791658439/Library/Library.csproj --framework net10.0 --trust-project --db .uographs/compact-output/fixture.db
+python3 -B scripts/measure_compact_output.py --db .uographs/compact-output/fixture.db --symbol be5b321dbf2f8008e726a7d6c752f760132eff0fa22fde86c09330b29e6a02b6 --output .uographs/compact-output/fixture-measured
+python3 -B scripts/measure_compact_output.py --db /Volumes/KioxiaDepom/Calismalarim/IslemKaydi/backend/.uographs/graph.db --symbol bf15fb544582ea6ca007bd9bee8764731c591f76ac9a548ef702feb1d1a540f7 --output .uographs/compact-output/islemkaydi-final
+python3 -B scripts/test_skill.py --cli src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll --db .uographs/bounded-output/validation/hello.db --evidence .uographs/compact-output/skill-delivery.json
+python3 -B scripts/check_contracts.py --db .uographs/bounded-output/validation/hello.db --index-raw .uographs/bounded-output/validation/index.json --evidence .uographs/compact-output/contracts-delivery
+python3 -B scripts/audit_licenses.py --check
+git diff --check
+```
+
+Changed files/areas: Core `GraphQuery`, `ReadOutputWriter`, new `CompactQueryWriter`,
+`DeliveryWriter`; Storage `GraphQueries`; CLI `Program`; version props; new compact
+integration tests/source fixture; measurement/schema/skill validation scripts;
+envelope schema, README/query/architecture/context/skill docs, AI-OUTPUT and actual
+JSON example, STATUS; five skill/reference copies and plugin version/readme/catalog.
+Remaining limits: multi-hop has no cursor; property filtering also excludes custom
+accessors and needs complementary inspection; indivisible records may require
+narrowing or a larger budget; aggregate adjacency count/projection cost at extreme
+limits is unbenchmarked. No general runtime/absence/freshness claim is added.
+Suggested commit: `feat: add compact graph queries with semantic call filters and paging`.
 
 ## CI trigger filtering — 2026-10-10
 

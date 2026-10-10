@@ -3,12 +3,13 @@ using System.Text.Json.Nodes;
 
 namespace UO.Graphs.Core;
 
-public sealed record ReadOutputOptions(string Details = "summary", int? MaxChars = null)
+public sealed record ReadOutputOptions(string Details = "summary", int? MaxChars = null, string View = "standard")
 {
     public int Budget => MaxChars ?? 12000;
     public bool Full => Details == "full";
     public void Validate()
     {
+        if (View is not ("standard" or "compact")) throw new GraphException(2, "--view must be standard or compact.");
         if (Details is not ("summary" or "full")) throw new GraphException(2, "--details must be summary or full.");
         if (Full && MaxChars is not null) throw new GraphException(2, "--details full cannot be combined with --max-chars.");
         if (Budget is < 1 or > 1000000) throw new GraphException(2, "--max-chars must be 1..1000000.");
@@ -64,6 +65,7 @@ public static class ReadOutputWriter
                 query.ResolvedStart, query.ResolvedTarget, options.Details, new(options.Full ? null : options.Budget),
                 new(diagnostics.Omitted, context.OmittedProjects, !options.Full, [])));
             ProjectMetadata(document, options.Full, metadataSamples);
+            if (options.View == "compact") document = CompactQueryWriter.Project(document, query, items);
             var text = OutputJson.SerializeCounted(document);
             if (options.Full || OutputJson.Characters(text) <= options.Budget) return new(text, result.ExitCode);
             if (samples.Count > 0) { samples.RemoveAt(samples.Count - 1); continue; }
@@ -71,6 +73,12 @@ public static class ReadOutputWriter
             if (context.Projects.Length > 0) { projectLimit = context.Projects.Length - 1; continue; }
             if (items.Count > minimumItems)
             {
+                if (options.View == "compact")
+                {
+                    items.RemoveAt(items.Count - 1);
+                    reasons.Add("maxChars");
+                    continue;
+                }
                 var excess = OutputJson.Characters(text) - options.Budget;
                 var removed = 0;
                 do

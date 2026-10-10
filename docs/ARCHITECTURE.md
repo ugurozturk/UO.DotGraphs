@@ -26,7 +26,7 @@ Local C# project/solution
 
 ## Current contracts
 
-Product **0.11.0**, query/status contract **6**, index/doctor contract **4**, SQLite schema **3**, context/export
+Product **0.12.0**, standard query/status contract **6**, opt-in compact query **1**, index/doctor contract **4**, SQLite schema **3**, context/export
 format **1**, declaration identity **2**. These versions describe different
 contracts and must not be substituted for each other. Phase-specific older
 versions are historical records under `docs/history/`.
@@ -111,7 +111,10 @@ REFERENCES and DECLARES are not propagation rules. See [QUERIES](QUERIES.md).
 
 Query/status project stored analysis into dedicated output models, with a default
 12,000-scalar budget and separate metadata omission counts. Storage schema and
-records are unchanged. Full details remain opt-in. See [migration](MIGRATION-0.11.md).
+records are unchanged. Full details remain opt-in. Compact v1 normalizes shared graph records and supports
+snapshot-bound one-hop relationship pages with explicit property filters. It uses
+stored Roslyn accessor identity tags and adds no extraction domain or storage
+migration. See [AI output](AI-OUTPUT.md) and [migration](MIGRATION-0.11.md).
 
 Context/export use bounded selection in Storage and contracts/serialization in
 Core. Context enforces a whole-stdout Unicode-scalar budget by removing records,

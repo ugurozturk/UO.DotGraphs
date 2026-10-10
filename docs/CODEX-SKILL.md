@@ -86,7 +86,7 @@ CLI/IDE users can inspect `/skills`. If a new skill does not appear, restart Cod
 Check for same-named skills in other scopes because Codex does not merge them.
 No optional UI metadata is required; automatic selection remains enabled by default.
 
-Provide a prepared CLI 0.11.0 and explicit database path. The skill selects the
+Provide a prepared CLI 0.12.0 and explicit database path. The skill selects the
 shortest useful route: definition lookup and source, the needed semantic query,
 or bounded impact with source/tests. Help is conditional on unknown compatibility;
 doctor diagnoses runtime trouble. Query metadata usually replaces a separate
@@ -126,3 +126,9 @@ invocation, an exact-symbol question with file/line evidence, ambiguous selectio
 missing CLI/index, stale/partial coverage, denied terminal access, and literal
 handling of instruction-like graph text. Confirm that no automatic restore/index
 or permission change occurs. Keep these results separate from automated tests.
+
+Compact query v1, explicit accessor filters, snapshot-bound one-hop continuation,
+and the actual CLI examples are described in [AI output](AI-OUTPUT.md). Standard
+query/status v6 remains the default. The skill recommends source/test reads for
+workflow understanding and scales its report to the task; no command chain or
+automatic budget increase is required.

@@ -5,6 +5,8 @@ public enum TraversalDirection { Outgoing, Incoming, Both }
 public sealed record QueryOptions(TraversalDirection Direction, RelationshipKind[] EdgeTypes,
     int Depth = 1, int Limit = 100, bool IncludeInferred = false, int MaxEdges = 10000, int EvidenceLimit = 20)
 {
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DirectQuerySelection? Selection { get; init; }
     public static readonly RelationshipKind[] Dependencies = [RelationshipKind.CALLS, RelationshipKind.USES_TYPE,
         RelationshipKind.INHERITS, RelationshipKind.IMPLEMENTS, RelationshipKind.OVERRIDES, RelationshipKind.PROJECT_REFERENCES,
         RelationshipKind.HANDLED_BY, RelationshipKind.ACTIVATES, RelationshipKind.INJECTS,
@@ -22,6 +24,15 @@ public sealed record QueryOptions(TraversalDirection Direction, RelationshipKind
 
     public void Validate(string command)
     {
+        if (Selection is { } selection)
+        {
+            if (command is not ("callees" or "callers" or "dependencies") || Depth != 1)
+                throw new GraphException(2, "Compact paging/filtering requires callees, callers or dependencies with --depth 1.");
+            if (selection.Calls is not ("all" or "exclude-properties" or "only-properties"))
+                throw new GraphException(2, "--calls must be all, exclude-properties or only-properties.");
+            if (selection.After is not null && selection.Snapshot is null)
+                throw new GraphException(2, "--after requires --snapshot from the previous compact page.");
+        }
         if (!Enum.IsDefined(Direction) || EdgeTypes.Length == 0 || EdgeTypes.Any(k => !Enum.IsDefined(k)) ||
             Depth is < 0 or > 100 || Limit is < 1 or > 10000 || MaxEdges is < 1 or > 1000000 || EvidenceLimit is < 1 or > 1000)
             throw new GraphException(2, "Invalid query bounds: depth 0..100, limit 1..10000, max-edges 1..1000000, evidence-limit 1..1000.");
@@ -32,8 +43,14 @@ public sealed record QueryOptions(TraversalDirection Direction, RelationshipKind
 
 public sealed record QueryCompleteness(string Coverage, string[] Limitations);
 public sealed record QueryDiagnostic(string Code, string Message);
-public sealed record QueryStep(string FromId, string ToId, bool Reversed, GraphRelationship Relationship,
-    RelationshipOccurrence[] Evidence, bool EvidenceTruncated);
+public sealed record DirectQuerySelection(string Calls = "all", string? After = null, string? Snapshot = null);
+public sealed record DirectQueryPage(int Eligible, int Filtered, int BeforePage, int Collected, string Calls, string CursorScope);
+public sealed record QueryStep(string FromId, string? ToId, bool Reversed, GraphRelationship Relationship,
+    RelationshipOccurrence[] Evidence, bool EvidenceTruncated)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int? EvidenceTotal { get; init; }
+}
 public sealed record QueryItem(RelationshipSymbol Symbol, GraphEntity? Entity, int Distance, QueryStep[] Path);
 public sealed record QueryLimits(int Depth, int Limit, int MaxEdges, int EvidenceLimit,
     int Returned, int ExaminedEdges, string[] Reasons);
@@ -44,6 +61,8 @@ public sealed record QueryEnvelope(int SchemaVersion, string SnapshotId, Analysi
 {
     public RelationshipSymbol? ResolvedStart { get; init; }
     public RelationshipSymbol? ResolvedTarget { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DirectQueryPage? Page { get; init; }
 }
 
 public sealed record QueryResult(QueryEnvelope Envelope, int ExitCode = 0);

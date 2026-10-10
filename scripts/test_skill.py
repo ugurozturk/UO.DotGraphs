@@ -142,7 +142,10 @@ def run(args, expected=0, env=None, timeout=45):
     document = json.loads(stdout)
     if args[0] in ("query", "status"):
         version_field = "schemaVersion" if args[0] == "query" else "contractVersion"
-        if document[version_field] != 6:
+        if document.get("view") == "compact":
+            if document.get("compactVersion") != 1 or document.get("baseQueryVersion") != 6 or "schemaVersion" in document:
+                raise AssertionError("Skill requires explicit compact query contract 1")
+        elif document[version_field] != 6:
             raise AssertionError("Skill requires query/status contract 6")
         if not stdout.endswith("\n") or document["budget"]["actualChars"] != len(stdout):
             raise AssertionError("Budget must include every Unicode scalar and final LF")
@@ -327,7 +330,7 @@ class ArtifactTests(unittest.TestCase):
 
     def test_examples_are_bounded_and_no_shell_or_approval_metadata(self):
         commands = examples(SKILL / "references/cli.md")
-        self.assertEqual(14, len(commands))
+        self.assertEqual(17, len(commands))
         for command in commands:
             self.assertFalse(set(command) & {";", "|", "&&", "||", ">", "--full", "--allow-generators"})
             if command[1] in ("query", "status") and "full" in command:
@@ -371,6 +374,7 @@ class CliTests(unittest.TestCase):
     def values(self):
         return {"DB": str(self.db), "TEXT": "Greet", "SYMBOL_ID": self.symbols["Greet"]["id"],
                 "TARGET_ID": self.symbols["Welcome"]["id"], "INPUT": str(self.directory / "Missing.csproj"),
+                "MESSAGE_ID": self.symbols["Greet"]["id"], "SNAPSHOT_ID": self.snapshot,
                 "ROOT": str(self.directory), "CONFIGURATION": "Debug", "TFM": "net10.0"}
 
     def test_reference_examples_in_real_subprocesses(self):
@@ -381,6 +385,14 @@ class CliTests(unittest.TestCase):
                 args = [values.get(token, token) for token in command[1:]]
                 # Positive update is a separate explicit --run-index test. Here verify
                 # approved-mode parsing and missing-assets handling without restore.
+                # HelloGraph has no mediator contract: MESSAGE_ID exercises parser/empty-scope
+                # behavior here; CompactMediator integration tests prove real framework links.
+                if "--after" in args:
+                    # This small fixture has no continuation page. A literal unknown cursor
+                    # must fail closed; real multi-page positive coverage is in CompactOutputTests.
+                    rejected = run(args, expected=2)
+                    self.assertIn("cursor", rejected)
+                    continue
                 result = run(args, expected=4 if args[0] == "index" else 0)
                 if args[0] == "index":
                     self.assertIn("assets missing", result)

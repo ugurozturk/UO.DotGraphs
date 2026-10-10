@@ -185,3 +185,13 @@ queries are not whole-database integrity scans and never repair the database.
 Status and legacy storage reads support schemas 1/2. Current query commands return
 exit 4 and require explicit re-indexing. Successful indexing atomically replaces
 with schema 3; failure preserves the old schema and snapshot.
+
+## Opt-in compact query contract (0.12)
+
+`--view compact` selects compact v1; the default standard view remains v6.
+See [AI output](AI-OUTPUT.md) for shared tables, explicit property filtering,
+snapshot-bound one-hop relationship pages, unresolved observations, counts,
+compatibility, and measured examples. The BFS/node-deduplication contract above
+still governs standard output and compact multi-hop/find/symbol/path/impact.
+Compact depth-1 callees/callers/dependencies return individual relationships and
+can therefore expose multiple kinds or confidence classes for the same endpoint.

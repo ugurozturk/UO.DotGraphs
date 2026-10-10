@@ -6,7 +6,7 @@ description: "Use the local UO.Graphs CLI to locate C#/.NET symbols, inspect sou
 # UO.Graphs
 
 Use a prepared local CLI and explicit database in the authorized repository.
-This skill targets CLI **0.11.0**, query/status **v6**. Consult the
+This skill targets CLI **0.12.0**, standard query/status **v6**, compact query **v1**. Consult the
 [CLI reference](references/cli.md) for compatibility, options, output and failures
 when needed. Check `--help` once if CLI version/compatibility is unknown; use
 `doctor` for runtime/SDK trouble. Do not install, build or restore automatically.
@@ -16,6 +16,11 @@ when needed. Check `--help` once if CLI version/compatibility is unknown; use
 - **Find a definition:** use `rg` when a name/file lookup suffices. If the user
   specifically requests uographs, run a small `query find`, then read the relevant
   source. Context and relationship queries are optional.
+- **Understand a workflow:** read the short method body and relevant tests first.
+  Use graph evidence for uncertain dependencies, interface bindings or mediator links.
+  For direct calls use `--view compact --calls exclude-properties`; this explicitly
+  excludes property accessors, including custom bodies. Inspect them separately with
+  `--calls only-properties` when relevant. No filter implies business importance.
 - **Inspect a semantic relationship:** when the symbol is ambiguous, use a small
   `query find` and establish the exact ID; otherwise query the known ID directly.
   Run only the needed bounded `callers`, `callees` or `path`. Use `context` when
@@ -34,8 +39,10 @@ A matching source hash does not establish global freshness. Preserve partial,
 stale, unknown and truncation warnings; incomplete empty results prove no absence.
 Never silently select the first ambiguous or lexical candidate.
 
-Prefer summary output (12,000 Unicode scalars including the final LF). Increase a
-budget only for a concrete need; do not load full diagnostics into model context
+Prefer compact query output with summary metadata (12,000 Unicode scalars including
+the final LF). On truncation, narrow the symbol/edge types/direction or follow the
+compact one-hop page continuation using the same query policy and snapshot. Do not
+automatically grow budgets. Use standard `query symbol` for omitted identity detail; do not load full diagnostics into model context
 by default. Preserve whole source/relationship/path evidence. Read relevant current
 source lines within the authorized scope, checking symlink destinations and graph
 source evidence. `--include-inferred` is opt-in, not a conversion to exact evidence.
@@ -60,7 +67,9 @@ restore, switch to a full index, enable generators or retry failed indexing.
 
 ## Report evidence
 
-Include snapshot/scope, freshness, coverage/limitations, truncation, relevant
+Scale the report to the task: a definition lookup needs a location and relevant
+limitations; a workflow/change assessment needs the supporting relationships and
+tests. Preserve snapshot/scope, freshness, coverage/limitations, truncation, relevant
 file:line evidence and actual tests (or `NOT RUN` with reason). Keep `exact`,
 `inferred` with rule/reason, and `unresolved` with reason/unknown target distinct.
 CALLS names a compile-time target; static evidence is not a runtime guarantee.
