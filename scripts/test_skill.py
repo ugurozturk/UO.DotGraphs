@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shlex
 import signal
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -56,6 +57,43 @@ def lint(folder):
         raise ValueError("Reference is not discoverable")
 
 
+def lint_plugin(root):
+    """Check this skill-only distribution contract without downloading a schema."""
+    catalog = json.loads((root / ".agents/plugins/marketplace.json").read_text())
+    if catalog["name"] != "uographs" or len(catalog["plugins"]) != 1:
+        raise ValueError("Expected the uographs marketplace and a single plugin")
+    entry = catalog["plugins"][0]
+    if entry["name"] != "uographs" or entry["source"] != {"source": "local", "path": "./plugins/uographs"}:
+        raise ValueError("Unexpected plugin name or source path")
+    if entry["policy"] != {"installation": "AVAILABLE", "authentication": "ON_INSTALL"} or entry["category"] != "Productivity":
+        raise ValueError("Unexpected marketplace policy/category")
+    plugin = root / "plugins/uographs"
+    expected = {"plugin.json", "README.md", "LICENSE", "skills/uographs/SKILL.md", "skills/uographs/references/cli.md"}
+    if any(p.is_symlink() for p in plugin.rglob("*")) or plugin.is_symlink():
+        raise ValueError("Plugin must contain real files, not symlinks")
+    if {p.relative_to(plugin).as_posix() for p in plugin.rglob("*") if p.is_file()} != expected:
+        raise ValueError("Unexpected or missing plugin files")
+    manifest = json.loads((plugin / "plugin.json").read_text())
+    if set(manifest) != {"$schema", "name", "version", "description", "author", "repository", "license", "keywords", "extensions"}:
+        raise ValueError("Unexpected manifest fields; this plugin has no hooks, setup or services")
+    if manifest["$schema"] != "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" or manifest["name"] != entry["name"]:
+        raise ValueError("Invalid plugin schema or identity")
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", manifest["version"]) or manifest["license"] != "MIT":
+        raise ValueError("Invalid plugin version/license")
+    extension = manifest["extensions"]
+    if set(extension) != {"com.openai"} or set(extension["com.openai"]) != {"interface"}:
+        raise ValueError("Only display metadata is allowed in this skill-only plugin")
+    if extension["com.openai"]["interface"]["displayName"] != "UO.Graphs":
+        raise ValueError("Incorrect plugin display name")
+    if (plugin / "LICENSE").read_bytes() != (ROOT / "LICENSE").read_bytes():
+        raise ValueError("Plugin license differs from the product license")
+    skill = plugin / "skills/uographs"
+    lint(skill)
+    for name in ("SKILL.md", "references/cli.md"):
+        if (skill / name).read_bytes() != (CODEX_TEMPLATE / name).read_bytes():
+            raise ValueError("Plugin skill differs from the standalone template")
+
+
 def examples(path):
     return [shlex.split(line) for block in re.findall(r'```sh\n(.*?)```', path.read_text(encoding="utf-8"), re.S)
             for line in block.splitlines() if line.startswith("uographs ")]
@@ -89,6 +127,41 @@ def run(args, expected=0, env=None, timeout=45):
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_plugin_marketplace_manifest_and_standalone_parity(self):
+        lint_plugin(ROOT)
+
+    def test_plugin_linter_rejects_broken_or_expanded_packages(self):
+        for invalid in ("source", "identity", "manifest", "reference", "drift", "hook", "license"):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                shutil.copytree(ROOT / ".agents/plugins", root / ".agents/plugins")
+                shutil.copytree(ROOT / "plugins/uographs", root / "plugins/uographs")
+                plugin = root / "plugins/uographs"
+                if invalid == "source":
+                    path = root / ".agents/plugins/marketplace.json"
+                    value = json.loads(path.read_text())
+                    value["plugins"][0]["source"]["path"] = "../outside"
+                    path.write_text(json.dumps(value))
+                elif invalid == "manifest":
+                    (plugin / "plugin.json").unlink()
+                elif invalid == "reference":
+                    (plugin / "skills/uographs/references/cli.md").unlink()
+                elif invalid == "drift":
+                    with (plugin / "skills/uographs/SKILL.md").open("a") as file:
+                        file.write("\nUnexpected change\n")
+                elif invalid == "license":
+                    (plugin / "LICENSE").write_text("different license")
+                else:
+                    path = plugin / "plugin.json"
+                    value = json.loads(path.read_text())
+                    if invalid == "identity":
+                        value["name"] = "other"
+                    else:
+                        value["extensions"]["com.openai"]["hooks"] = "./hooks.json"
+                    path.write_text(json.dumps(value))
+                with self.assertRaises(ValueError):
+                    lint_plugin(root)
+
     def test_frontmatter_references_and_template_parity(self):
         for skill, template in ((SKILL, TEMPLATE), (CODEX_SKILL, CODEX_TEMPLATE)):
             for folder in (skill, template):

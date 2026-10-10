@@ -15,6 +15,8 @@ entire selected project closure.
 Static extractors cover Microsoft DI, ASP.NET Core, UO.Mediator, MediatR,
 MassTransit, ABP, EF Core, and Refit within documented API/version boundaries.
 The optional VS Code GitHub Copilot and Codex skills consume the independent CLI.
+Codex can install its skill once through the UO.Graphs plugin marketplace; the
+CLI and each repository's graph index remain separately prepared prerequisites.
 Phase 11 added performance and failure handling improvements, tool packaging,
 and release verification. [STATUS](STATUS.md) separates implementation from
 actual acceptance and remaining gates.

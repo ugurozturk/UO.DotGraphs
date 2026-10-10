@@ -233,18 +233,23 @@ permissions or bypass organizational restrictions. CLI tests and installed forma
 support have been checked; **real Copilot E2E remains NOT RUN**.
 See [installation and manual acceptance](docs/COPILOT-SKILL.md).
 
-The [Codex skill](.agents/skills/uographs/SKILL.md) provides the same bounded CLI
-workflow. Install its [standalone template](templates/codex/uographs/SKILL.md) into
-another authorized repository with:
+The [Codex plugin](plugins/uographs/README.md) provides the same bounded CLI
+workflow across your repositories. With `uographs` installed separately, add the
+marketplace and plugin once for your Codex account:
 
 ```sh
-python3 scripts/install_skill.py '/path/to/authorized/repository' --agent codex
+codex plugin marketplace add ugurozturk/UO.DotGraphs
+codex plugin add uographs@uographs
 ```
 
-This creates `.agents/skills/uographs`; the skill is already present in this
-checkout. Invoke it as `$uographs` in Codex. Installation preserves existing skills
-and `AGENTS.md`. **Real Codex E2E remains NOT RUN**; see
-[Codex installation and acceptance](docs/CODEX-SKILL.md).
+These GitHub commands require the marketplace files to be published to the remote
+repository; local implementation alone does not establish remote availability.
+The plugin contains the skill and CLI reference. It does not install the CLI or
+create graph indexes. Each repository needs its own prepared index. Existing
+standalone skills are preserved and may appear alongside the plugin skill.
+Invoke the plugin skill as `$uographs:uographs` (verified with Codex CLI 0.162.1).
+See [Codex installation and acceptance](docs/CODEX-SKILL.md) for local testing,
+NuGet prerequisites, the existing Python installer, and verification boundaries.
 
 ## Documentation
 

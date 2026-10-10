@@ -3,7 +3,7 @@
 Last updated: **2026-10-10**.
 
 **Phase 11 hardening is implemented; full release acceptance remains incomplete.**
-Product **UO.Graphs 0.9.0**, package **UO.Graphs.Cli**, command **uographs**.
+Product **UO.Graphs 0.9.1**, package **UO.Graphs.Cli**, command **uographs**.
 Query/index JSON **4**, SQLite **3**, context/export **1**, declaration identity **2**.
 No new product analysis domain, service, or runtime dependency was added by hardening.
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
@@ -16,7 +16,7 @@ checks below. Historical failures remain evidence of their original environments
 
 | Check | Latest verified result |
 | --- | --- |
-| macOS ARM64 Release build | PASS, SDK 10.0.201; latest pre-documentation fixture-fix build 17.31 s, zero warnings/errors |
+| macOS ARM64 Release build | PASS, SDK 10.0.201; plugin distribution validation build 5.29 s, zero warnings/errors |
 | macOS standard VSTest | PASS **55/55 unit**, **99/99 integration**, zero skipped; integration 11m54s |
 | Linux CI at `5b52a01` | PASS **55/55 unit**, **99/99 integration**, zero skipped; Release build, audit, pack, installed-tool fresh index/query/context passed |
 | NuGet Trusted Publishing | PASS; verified 0.9.0 artifact pushed through OIDC on 2026-10-10 |
@@ -28,7 +28,90 @@ checks below. Historical failures remain evidence of their original environments
 | 1000-project analysis / peak process-tree RSS / true cache-cold measurement | NOT RUN |
 | Real VS Code/Copilot E2E | NOT RUN; file-format and CLI tests are separate |
 | Codex skill packaging / installation | PASS on macOS; repository/template parity, installer negatives, actual-package extraction/install |
-| Real Codex E2E | NOT RUN; discovery/model behavior is separate from CLI tests |
+| Codex plugin installation / discovery | PASS on macOS, Codex CLI 0.162.1; local marketplace, isolated profile, installed/enabled plugin and user-scope discovery in two repositories |
+| Model-driven Codex E2E | NOT RUN; model selection/answers remain separate from verified installation/discovery |
+
+## Codex plugin marketplace distribution — 2026-10-10
+
+The repository now exposes marketplace `uographs` and plugin `uographs@uographs`.
+The portable plugin manifest starts at version **0.1.0**, independent of the CLI
+NuGet version **0.9.1**. The plugin bundles the MIT license, documentation, and
+byte-matched standalone Codex skill/reference. It adds no dependency, MCP server,
+hook, setup skill, service, or automatic installation/restore/indexing.
+
+The requested GitHub installation is:
+
+```sh
+codex plugin marketplace add ugurozturk/UO.DotGraphs
+codex plugin add uographs@uographs
+```
+
+These commands become usable after the marketplace files are published remotely.
+**Remote GitHub installation: NOT RUN**; this work did not commit, push or publish.
+CLI installation remains a separate explicit NuGet step. Existing repository
+skills, Python installer, NuGet templates, user configuration and global CLI
+installation were preserved. The unpublished `uographs skill add codex` command
+from the preceding conversation was removed, including only its new installer,
+new tests, embedded resources, and package-smoke additions. The CLI source and
+package-smoke script have no remaining diff against the starting commit.
+
+Commands run on macOS ARM64 with prepared SDK/assets (no restore):
+
+```sh
+python3 -B scripts/test_skill.py --evidence .uographs/codex-plugin/artifacts.json
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Phase10ApprovedIncrementalSkillWorkflowAcrossProcesses|FullyQualifiedName~BadArgumentsProduceOnlyStderr|FullyQualifiedName~HelpAndDoctorRunWithoutLoadingTarget' --logger 'trx;LogFileName=plugin-cli.trx' --results-directory .uographs/codex-plugin
+dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/codex-plugin/packages
+python3 -B scripts/smoke_package.py .uographs/codex-plugin/packages --version 0.9.1 --evidence .uographs/codex-plugin/package-smoke
+python3 -B scripts/test_ci_package.py
+python3 -B scripts/audit_licenses.py --check
+git diff --check
+```
+
+Real Codex checks used only a child-process profile at
+`.uographs/codex-plugin/codex-test-profile`; no user config/auth files were copied
+or changed. The commands were executed with that child's `CODEX_HOME` configured
+for the test directory, not the user's normal profile:
+
+```sh
+codex --version
+codex plugin marketplace add /Volumes/KioxiaDepom/Calismalarim/UO.DotGraphs --json
+codex plugin add uographs@uographs --json
+codex plugin list --marketplace uographs --available --json
+codex app-server generate-json-schema --out .uographs/codex-plugin/protocol
+codex app-server --stdio
+```
+
+The fresh stdio process received `initialize`, `initialized`, then `skills/list`
+with `forceReload: true` and two unrelated temporary repository directories.
+Both returned `uographs:uographs`, `scope: user`, `enabled: true`,
+`pluginId: uographs@uographs`, the installed cache path, and no discovery errors.
+No model turn was invoked and no source/graph was sent to a model. This is local
+installation/discovery evidence, not model-driven acceptance.
+
+| Check | Actual result |
+| --- | --- |
+| Release build | PASS **5.29 s**, zero warnings/errors |
+| Artifact tests | PASS **10/10**; includes marketplace/portable manifest, plugin/template parity, and seven negative package mutations |
+| Focused Release integration tests | PASS **8/8**, zero skipped, **32 s**; existing argument/help/doctor and incremental skill workflow |
+| Real Codex marketplace/plugin add | PASS, CLI **0.162.1**; plugin **0.1.0**, installed and enabled in isolated profile |
+| Fresh Codex skill discovery | PASS in **two unrelated directories**; plugin skill `uographs:uographs` at user scope |
+| Installed NuGet package smoke | PASS local-feed install/help/doctor/trust refusal, fresh HelloGraph index (**15 entities**, index subprocess **9.854 s**), separate query/context |
+| Package gate tests / licenses | PASS **10/10**; **143** locked package/version entries, no dependency changes |
+| Full .NET suite / Linux / Windows / live CI | NOT RUN for this distribution change; earlier results above remain historical |
+| Model-driven Codex E2E | NOT RUN; isolated profile has no copied authentication, no model request was made |
+| Remote marketplace install | NOT RUN; local files were not pushed |
+
+Evidence: `.uographs/codex-plugin/artifacts.json`, `plugin-cli.trx`,
+`marketplace-add.json`, `plugin-add.json`, `plugin-list.json`, `discovery.json`,
+and `package-smoke/commands.json`. The test NuGet package predates final doc/status
+updates and was not published. The existing CI artifact-test step automatically
+runs the extended plugin checks; no Codex runtime dependency was added to CI.
+
+Changed: `.agents/plugins/marketplace.json`; `plugins/uographs/` (manifest, README,
+license, skill/reference); `scripts/test_skill.py`; README; docs/CODEX-SKILL,
+ARCHITECTURE, PRODUCT, STATUS.
+Suggested commit: `feat(codex): distribute uographs through a plugin marketplace`
 
 ## Codex skill support — 2026-10-10
 
