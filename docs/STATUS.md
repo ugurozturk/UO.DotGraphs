@@ -9,6 +9,21 @@ No new product analysis domain, service, or runtime dependency was added by hard
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
 
+## CI trigger filtering — 2026-10-10
+
+`.github/workflows/ci.yml` now filters automatic main pushes and pull requests to
+`src/**/*.cs`. Documentation, README, tests, samples, scripts, and configuration
+changes alone do not trigger CI. Mixed changes still trigger when product C#
+source changes. Manual dispatch remains available. NuGet publishing still follows
+the existing successful first-party main-push CI artifact workflow.
+
+Validation: an inline `ruby -e` check using `YAML.load_file` parsed both workflows
+and `File.fnmatch?` checked 22 path scenarios across push and pull request, including
+mixed changes; all passed. The main branch filter and manual dispatch were checked.
+`git diff --check` passed. Live GitHub event execution, product build, .NET tests,
+and CLI smoke: **NOT RUN** for this workflow-filter-only change.
+Suggested commit: `ci: trigger automatic builds only for product source changes`.
+
 ## Metadata budget follow-up — 2026-10-10
 
 CLI **0.11.0**, query/status **v6**, plugin **0.3.0**. The default remains

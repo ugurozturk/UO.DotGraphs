@@ -1,9 +1,14 @@
 name: build-test-pack
 
 on:
+  # Automatically run only when product C# source changes.
   push:
     branches: [main]
+    paths:
+      - 'src/**/*.cs'
   pull_request:
+    paths:
+      - 'src/**/*.cs'
   workflow_dispatch:
 
 permissions:
