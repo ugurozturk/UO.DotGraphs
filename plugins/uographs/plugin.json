@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "uographs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Use the local UO.Graphs CLI to inspect C#/.NET symbols, source-backed relationships and change impact. Requires a separately installed CLI and prepared graph index.",
   "author": {
     "name": "Ugur Ozturk",

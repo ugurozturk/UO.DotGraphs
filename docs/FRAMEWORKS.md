@@ -3,7 +3,7 @@
 These extractors record **static declarations**, not execution, container membership,
 resolution, or host activation. UO.Graphs does not load the analyzed assembly through
 reflection or start its application, container, HTTP host, or database. Current
-source 0.10.0 uses query/status JSON v5 / SQLite 3 / delivery 1; these extractors began in Phase 7.
+source 0.11.0 uses query/status JSON v6 / SQLite 3 / delivery 1; these extractors began in Phase 7.
 
 ## Extractor contract
 

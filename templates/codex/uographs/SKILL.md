@@ -6,7 +6,7 @@ description: "Use the local UO.Graphs CLI to locate C#/.NET symbols, inspect sou
 # UO.Graphs
 
 Use a prepared local CLI and explicit database in the authorized repository.
-This skill targets CLI **0.10.0**, query/status **v5**. Consult the
+This skill targets CLI **0.11.0**, query/status **v6**. Consult the
 [CLI reference](references/cli.md) for compatibility, options, output and failures
 when needed. Check `--help` once if CLI version/compatibility is unknown; use
 `doctor` for runtime/SDK trouble. Do not install, build or restore automatically.
@@ -26,7 +26,9 @@ when needed. Check `--help` once if CLI version/compatibility is unknown; use
   may now be stale.
 
 Validate snapshot input/root, TFM, configuration and generator policy from query
-metadata. Run `status` only if needed to establish scope or diagnose the index.
+metadata. Reuse CLI compatibility and scope already verified in this session
+for the same executable, database and snapshot; recheck after they change.
+If a required context was omitted, request full details once for that scope. Run `status` only if needed to establish scope or diagnose the index.
 Check freshness when the task needs it; unchecked output remains `notChecked`.
 A matching source hash does not establish global freshness. Preserve partial,
 stale, unknown and truncation warnings; incomplete empty results prove no absence.
@@ -62,4 +64,8 @@ Include snapshot/scope, freshness, coverage/limitations, truncation, relevant
 file:line evidence and actual tests (or `NOT RUN` with reason). Keep `exact`,
 `inferred` with rule/reason, and `unresolved` with reason/unknown target distinct.
 CALLS names a compile-time target; static evidence is not a runtime guarantee.
-Metadata samples omitted for size are separate from missing graph coverage.
+Metadata samples omitted or shortened for size are separate from missing graph
+coverage and traversal truncation. Read `metadataSummary.fields`; an empty sampled
+list does not prove no limitations. Follow `freshnessCheck.reasonsReference` when
+present. A small find result is sufficient for a definition lookup; do not run
+context or callers/callees unless the task needs that information.

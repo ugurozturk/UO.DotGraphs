@@ -3,11 +3,108 @@
 Last updated: **2026-10-10**.
 
 **Phase 11 hardening is implemented; full release acceptance remains incomplete.**
-Source **UO.Graphs 0.10.0**, package **UO.Graphs.Cli**, command **uographs**.
-Query/status JSON **5**, index/doctor **4**, SQLite **3**, context/export **1**, declaration identity **2**.
+Source **UO.Graphs 0.11.0**, package **UO.Graphs.Cli**, command **uographs**.
+Query/status JSON **6**, index/doctor **4**, SQLite **3**, context/export **1**, declaration identity **2**.
 No new product analysis domain, service, or runtime dependency was added by hardening.
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
+
+## Metadata budget follow-up — 2026-10-10
+
+CLI **0.11.0**, query/status **v6**, plugin **0.3.0**. The default remains
+12,000 Unicode scalars including the final LF. Summary now samples fingerprint
+and coverage limitations, freshness reasons, project symbols/skipped TFMs and
+long project paths. `metadataSummary.fields` reports totals, omitted entries and
+shortened displayed values by JSON Pointer. Optional metadata and project
+contexts are reduced before whole result tails. Graph truncation remains separate.
+Duplicate freshness/fingerprint explanations use one list plus `reasonsReference`,
+including in full output. Full keeps original metadata; schema 3 needs no rebuild.
+See [migration and consumer changes](MIGRATION-0.11.md).
+
+The reproducible `MetadataBudgetTests` fixture has 2,400 diagnostics, 114 long
+Unicode/escaped fingerprint limitations, 114 projects with long paths/symbol
+lists, and one CALLS relationship with six source occurrences. Tests compare
+summary/full items, deterministic repeats, explicit evidence limits, metadata
+pruning before any items, Unicode identity/source preservation, partial/stale/
+unknown/notChecked, ambiguity, notFound and depth limits. Existing exact-budget,
+one-character-too-small and context tests passed. Roslyn semantic extraction,
+SQLite storage, dependencies and context/export writers are unchanged.
+
+Real read-only comparison used the existing IslemKaydi snapshot
+`003729cdc2294eb88cf5da2d8b67b651`, 14 projects, net10.0/Debug, 1,930 diagnostics,
+114 fingerprint limitations, and symbol
+`8dc3419edfb4a08129cdb810aa947a6fc83d829fc22bdff665f6622977c1d055`
+(`CurrentAccessAppService.IsFeatureEnabledForPermission`). No re-index or generator
+execution was requested on that repository. DB SHA-256 stayed unchanged.
+
+| Read | 0.10.0 default exit / bytes | 0.10.0 with 40,000 exit / bytes | 0.11.0 default exit / bytes |
+| --- | --- | --- | --- |
+| status | 2 / 0 | 0 / 35,110 | 0 / 9,306 |
+| find, limit 1 | 2 / 0 | 0 / 31,391 | 0 / 6,956 |
+| callers | 2 / 0 | 0 / 33,458 | 0 / 9,023 |
+| callees | 2 / 0 | 0 / 35,969 | 0 / 11,535 |
+
+Bytes equal serialized Unicode scalars in these escaped JSON outputs, including
+LF. Find/callers/callees items match the old full output exactly; callees retains
+six occurrences. Callers retains its original `depth` traversal flag; no result
+was removed for `maxChars`. All unchecked reads remain `notChecked`. One separate
+`status --check-freshness` returned exit 0, 9,287 bytes, `stale`, `partial`, and
+fingerprint `complete=false`: 23,925 files / 1,636,909,989 bytes hashed in 2,817 ms
+(scanner timer). This is not a fresh/complete acceptance claim or a speed/token
+savings claim. Final full output sizes: status 1,178,944; find 1,181,567; callers
+1,183,634; callees 1,186,145 bytes. Context read: exit 0, 11,735 bytes.
+
+| Verification (macOS 27.0.1 ARM64, SDK 10.0.201, runtime 10.0.5) | Result |
+| --- | --- |
+| Release build | exit 0; zero warnings/errors, final 2.95 s |
+| Unit tests | exit 0; **55/55**, 7 s |
+| Final output/context regression tests | exit 0; **42/42**, 37 s |
+| CLI/consumer/semantic/export regression tests | exit 0; **8/8**, 26 s |
+| Skill/template/plugin and actual read subprocess tests | exit 0; **17/17**, 13.566 s |
+| Envelope schema validator | exit 0; six envelopes plus six incompatible-version negatives |
+| Final repeated read-only measurements | exit 0; 42 CLI processes, all exit 0, DB unchanged |
+| Final artifact checks / git diff --check | exit 0; five skill copies match, all 42 envelopes validate, before/after items/limits/outcome match, repeated bytes match, local links/JSON/Python parse |
+| Full integration suite / Windows / Linux / agent E2E / package install | **NOT RUN** for this change; focused validation only |
+
+Initial sandbox VSTest aborted with `SocketException (13)` before tests; the
+permitted run passed 40/40, and final 42/42 includes two additional regression
+cases. An initial schema invocation referenced a nonexistent historical artifact;
+the final command below used the existing recorded index output and passed. An
+interim measurement with an incorrect exact signature returned domain exit 8;
+final measurements use the ID obtained from find. These are separate from passes.
+
+Raw stdout/stderr, exact argv, byte/scalar sizes, SHA-256 and TRX evidence are in
+`.uographs/metadata-budget/` (local ignored artifacts; private output not tracked).
+`before/` contains the 0.10.0 baseline, `verified-reads/` the final three repeats
+per scenario. Measurements include startup/pipe collection; cache was not flushed
+and concurrent test load was uncontrolled. Reproduce with the commands below.
+The test fixtures are tracked, synthetic output regressions rather than claims
+of analyzing a 114-project solution.
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit.trx' --results-directory .uographs/metadata-budget
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~BoundedOutput|FullyQualifiedName~MetadataBudget|FullyQualifiedName~Context' --logger 'trx;LogFileName=focused-final.trx' --results-directory .uographs/metadata-budget
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~AllCommandsEmitVersioned|FullyQualifiedName~ActualRoslynGraphQueries|FullyQualifiedName~RepeatedCliQueries|FullyQualifiedName~ExportFormats|FullyQualifiedName~DeliveryBounds|FullyQualifiedName~ResultDepthWork|FullyQualifiedName~HelpAndDoctor|FullyQualifiedName~Phase10Approved' --logger 'trx;LogFileName=consumers.trx' --results-directory .uographs/metadata-budget
+python3 -B scripts/test_skill.py --cli src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll --db .uographs/bounded-output/validation/hello.db --evidence .uographs/metadata-budget/skill.json
+python3 -B scripts/check_contracts.py --db .uographs/bounded-output/validation/hello.db --index-raw .uographs/bounded-output/validation/index.json --evidence .uographs/metadata-budget/contracts-final
+python3 -B scripts/measure_read_output.py --db /Volumes/KioxiaDepom/Calismalarim/IslemKaydi/backend/.uographs/graph.db --symbol 8dc3419edfb4a08129cdb810aa947a6fc83d829fc22bdff665f6622977c1d055 --find App.Access.CurrentAccessAppService.IsFeatureEnabledForPermission --max-chars 40000 --evidence .uographs/metadata-budget/verified-reads
+dotnet src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll status --check-freshness --db /Volumes/KioxiaDepom/Calismalarim/IslemKaydi/backend/.uographs/graph.db
+git diff --check
+```
+
+Source/template skills now reuse verified session compatibility/scope, allow find
+alone for definitions and explain freshness hashing cost. The tracked repository
+`.agents/skills` copy was updated; installed plugin caches were not changed. Full
+still has no size bound. A required root/input or indivisible first result/path
+larger than the budget still returns explanatory exit 2; metadata summary alone
+cannot imply absence of graph relations or analysis limitations.
+
+Changed areas: Core ReadOutputWriter/contracts, CLI help/version, output regression
+and consumer assertions, schema/measurement/skill/package-smoke consumers, all
+five skill/reference copies, plugin version/catalog, current contract docs and
+this status. Suggested commit: `fix: prioritize graph answers within metadata budgets`.
+No commit, push, package publication or user-index mutation was performed.
 
 ## Ubuntu Phase 8 CI timeout follow-up — 2026-10-10
 

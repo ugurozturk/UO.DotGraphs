@@ -151,7 +151,7 @@ public sealed partial class CliTests
             Assert.Empty(result.Error);
             using var json = JsonDocument.Parse(result.Output);
             var root = json.RootElement;
-            Assert.Equal(5, root.GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
             Assert.Equal("query-fixture", root.GetProperty("snapshotId").GetString());
             Assert.Equal("partial", root.GetProperty("completeness").GetProperty("coverage").GetString());
             Assert.Equal("notChecked", root.GetProperty("stale").GetString());

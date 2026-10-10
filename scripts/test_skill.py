@@ -142,8 +142,8 @@ def run(args, expected=0, env=None, timeout=45):
     document = json.loads(stdout)
     if args[0] in ("query", "status"):
         version_field = "schemaVersion" if args[0] == "query" else "contractVersion"
-        if document[version_field] != 5:
-            raise AssertionError("Skill requires query/status contract 5")
+        if document[version_field] != 6:
+            raise AssertionError("Skill requires query/status contract 6")
         if not stdout.endswith("\n") or document["budget"]["actualChars"] != len(stdout):
             raise AssertionError("Budget must include every Unicode scalar and final LF")
         if document["details"] == "summary":

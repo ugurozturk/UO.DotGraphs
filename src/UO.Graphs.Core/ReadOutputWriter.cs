@@ -24,7 +24,10 @@ public sealed record ReadAnalysisContext(string Id, DateTimeOffset CreatedAtUtc,
 public sealed record AnalysisDiagnosticSample(string Message, bool Truncated);
 public sealed record AnalysisDiagnosticsOutput(int Total, AnalysisDiagnosticSample[] Samples, int Omitted);
 public sealed record ReadBudget(int? MaxChars, string Unit = "unicodeScalarValuesIncludingFinalLF", int ActualChars = 0);
-public sealed record ReadMetadataSummary(int OmittedDiagnostics, int OmittedProjects, bool ProjectDetailsOmitted);
+// JSON Pointer paths identify sampled metadata; never graph records or traversal limits.
+public sealed record ReadMetadataField(string Path, int Total, int Omitted, int Shortened);
+public sealed record ReadMetadataSummary(int OmittedDiagnostics, int OmittedProjects, bool ProjectDetailsOmitted,
+    ReadMetadataField[] Fields);
 public sealed record QueryOutput(int SchemaVersion, string SnapshotId, ReadAnalysisContext AnalysisContext,
     QueryCompleteness Completeness, string Stale, bool Truncated, QueryItem[] Items, QueryDiagnostic[] Diagnostics,
     AnalysisDiagnosticsOutput AnalysisDiagnostics, string Command, string[] Arguments, QueryOptions Options,
@@ -48,19 +51,24 @@ public static class ReadOutputWriter
         var reasons = new SortedSet<string>(query.Limits.Reasons, StringComparer.Ordinal);
         // Even an ambiguous candidate remains a whole record, never an implicit selection.
         var minimumItems = items.Count > 0 ? 1 : 0;
+        var metadataSamples = true;
+        var projectLimit = 10;
         while (true)
         {
-            var context = Context(analysis, options.Full, RelevantProjects(query, items));
+            var context = Context(analysis, options.Full, RelevantProjects(query, items), projectLimit);
             var diagnostics = new AnalysisDiagnosticsOutput(analysis.Diagnostics.Length, samples.ToArray(), analysis.Diagnostics.Length - samples.Count);
             var document = Object(new QueryOutput(GraphJson.QueryContractVersion, query.SnapshotId, context,
                 query.Completeness, query.Stale, query.Truncated || reasons.Count > 0, items.ToArray(), query.Diagnostics,
                 diagnostics, query.Command, query.Arguments, query.Options,
                 query.Limits with { Returned = items.Count, Reasons = reasons.ToArray() }, query.Outcome,
                 query.ResolvedStart, query.ResolvedTarget, options.Details, new(options.Full ? null : options.Budget),
-                new(diagnostics.Omitted, context.OmittedProjects, !options.Full)));
+                new(diagnostics.Omitted, context.OmittedProjects, !options.Full, [])));
+            ProjectMetadata(document, options.Full, metadataSamples);
             var text = OutputJson.SerializeCounted(document);
             if (options.Full || OutputJson.Characters(text) <= options.Budget) return new(text, result.ExitCode);
             if (samples.Count > 0) { samples.RemoveAt(samples.Count - 1); continue; }
+            if (metadataSamples) { metadataSamples = false; continue; }
+            if (context.Projects.Length > 0) { projectLimit = context.Projects.Length - 1; continue; }
             if (items.Count > minimumItems)
             {
                 var excess = OutputJson.Characters(text) - options.Budget;
@@ -83,6 +91,7 @@ public static class ReadOutputWriter
         options ??= new();
         options.Validate();
         var samples = Diagnostics(analysis, options.Full).ToList();
+        var metadataSamples = true;
         var projects = analysis.Projects.OrderBy(p => p.Id, StringComparer.Ordinal).Take(options.Full ? int.MaxValue : 10).ToList();
         while (true)
         {
@@ -91,10 +100,12 @@ public static class ReadOutputWriter
             var document = Object(new StatusOutput(GraphJson.StatusContractVersion, "status", schemaVersion, database,
                 context, new(analysis.Coverage, analysis.Limitations), entityCount, relationshipCount, occurrenceCount,
                 diagnostics, options.Details, new(options.Full ? null : options.Budget),
-                new(diagnostics.Omitted, context.OmittedProjects, !options.Full)));
+                new(diagnostics.Omitted, context.OmittedProjects, !options.Full, [])));
+            ProjectMetadata(document, options.Full, metadataSamples);
             var text = OutputJson.SerializeCounted(document);
             if (options.Full || OutputJson.Characters(text) <= options.Budget) return new(text, 0);
             if (samples.Count > 0) { samples.RemoveAt(samples.Count - 1); continue; }
+            if (metadataSamples) { metadataSamples = false; continue; }
             if (projects.Count > 0) { projects.RemoveAt(projects.Count - 1); continue; }
             throw TooSmall(options, document, "status");
         }
@@ -122,9 +133,10 @@ public static class ReadOutputWriter
             return new AnalysisDiagnosticSample(string.Concat(runes.Take(300).Select(r => r.ToString())), runes.Length > 300);
         });
 
-    private static ReadAnalysisContext Context(AnalysisSnapshot analysis, bool full, HashSet<string> relevant)
+    private static ReadAnalysisContext Context(AnalysisSnapshot analysis, bool full, HashSet<string> relevant, int projectLimit = 10)
     {
         var projects = analysis.Projects.Where(p => full || relevant.Contains(p.Id)).OrderBy(p => p.Id, StringComparer.Ordinal)
+            .Take(full ? int.MaxValue : projectLimit)
             .Select(p => full ? (object)p : new ShortProjectContext(p.Id, p.Path, p.TargetFramework, p.Configuration,
                 p.SdkVersion, p.LanguageVersion, p.PreprocessorSymbols, p.SkippedTargetFrameworks)).ToArray();
         return new(analysis.Id, analysis.CreatedAtUtc, analysis.InputPath, analysis.RootPath, analysis.ToolVersion,
@@ -132,6 +144,60 @@ public static class ReadOutputWriter
             analysis.Coverage, analysis.Freshness, analysis.FreshnessCheck, analysis.DependencyFingerprint,
             projects, analysis.Projects.Length, analysis.Projects.Length - projects.Length);
     }
+
+    // Deliberately only metadata is sampled. IDs, source evidence, query diagnostics,
+    // outcome, coverage, freshness flags and fingerprint completeness remain intact.
+    private static void ProjectMetadata(JsonObject document, bool full, bool samples)
+    {
+        var contextName = document.ContainsKey("analysisContext") ? "analysisContext" : "analysis";
+        var context = document[contextName]!.AsObject();
+        var fields = new List<ReadMetadataField>();
+        var fingerprint = context["dependencyFingerprint"] as JsonObject;
+        var freshness = context["freshnessCheck"] as JsonObject;
+        // Unknown freshness can repeat all fingerprint limitations. Keep one copy even in full.
+        if (fingerprint?["limitations"] is JsonArray { Count: > 0 } limitations &&
+            freshness?["reasons"] is JsonArray reasons && JsonNode.DeepEquals(limitations, reasons))
+        {
+            freshness["reasons"] = new JsonArray();
+            freshness["reasonsReference"] = $"/{contextName}/dependencyFingerprint/limitations";
+        }
+        if (!full)
+        {
+            Sample(document["completeness"]!.AsObject(), "limitations", "/completeness/limitations");
+            if (fingerprint is not null) Sample(fingerprint, "limitations", $"/{contextName}/dependencyFingerprint/limitations");
+            if (freshness is not null && !freshness.ContainsKey("reasonsReference"))
+                Sample(freshness, "reasons", $"/{contextName}/freshnessCheck/reasons");
+            var projects = context["projects"]!.AsArray();
+            for (var i = 0; i < projects.Count; i++)
+            {
+                var project = projects[i]!.AsObject();
+                var path = $"/{contextName}/projects/{i}";
+                Sample(project, "preprocessorSymbols", path + "/preprocessorSymbols");
+                Sample(project, "skippedTargetFrameworks", path + "/skippedTargetFrameworks");
+                var original = project["path"]!.GetValue<string>();
+                var shortened = Clip(original);
+                if (original != shortened)
+                {
+                    project["path"] = shortened;
+                    fields.Add(new(path + "/path", 1, 0, 1));
+                }
+            }
+        }
+        document["metadataSummary"]!["fields"] = JsonSerializer.SerializeToNode(fields, OutputJson.Options);
+
+        void Sample(JsonObject owner, string name, string path)
+        {
+            if (owner[name] is not JsonArray array) return;
+            var values = array.Select(n => n!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray();
+            var selected = values.Take(samples ? 3 : 0).ToArray();
+            var shortened = selected.Select(Clip).ToArray();
+            owner[name] = JsonSerializer.SerializeToNode(shortened, OutputJson.Options);
+            fields.Add(new(path, values.Length, values.Length - selected.Length,
+                selected.Zip(shortened).Count(pair => pair.First != pair.Second)));
+        }
+    }
+
+    private static string Clip(string value) => string.Concat(value.EnumerateRunes().Take(300).Select(r => r.ToString()));
 
     private static HashSet<string> RelevantProjects(QueryEnvelope query, IEnumerable<QueryItem> items)
     {

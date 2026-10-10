@@ -67,7 +67,7 @@ public sealed partial class CliTests
         var before = await File.ReadAllBytesAsync(Database);
         using var compact = AssertBoundedJson(await Run("query", command, symbol, "--db", Database));
         var root = compact.RootElement;
-        Assert.Equal(5, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal("summary", root.GetProperty("details").GetString());
         Assert.Equal("partial", root.GetProperty("completeness").GetProperty("coverage").GetString());
         Assert.Equal(graph.Analysis.Limitations, root.GetProperty("completeness").GetProperty("limitations").EnumerateArray().Select(x => x.GetString()));
@@ -124,7 +124,7 @@ public sealed partial class CliTests
         var graph = BoundedOutputFixture();
         using var summary = AssertBoundedJson(await Run("status", "--db", Database));
         var root = summary.RootElement;
-        Assert.Equal(5, root.GetProperty("contractVersion").GetInt32());
+        Assert.Equal(6, root.GetProperty("contractVersion").GetInt32());
         Assert.Equal(3, root.GetProperty("schemaVersion").GetInt32());
         var analysis = root.GetProperty("analysis");
         Assert.Equal(31, analysis.GetProperty("totalProjects").GetInt32());
@@ -220,7 +220,7 @@ public sealed partial class CliTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task BoundedOutputOversizedRequiredMetadataOrFirstResultFailsWithoutPartialJson(bool oversizedProject)
+    public async Task BoundedOutputOversizedProjectMetadataFitsButRequiredSourceStillFails(bool oversizedProject)
     {
         var graph = BoundedOutputFixture(diagnosticCount: 0, projectCount: 1);
         if (oversizedProject)
@@ -230,9 +230,19 @@ public sealed partial class CliTests
         new GraphStore(Database).Replace(graph);
         var before = await File.ReadAllBytesAsync(Database);
         var result = await Run("query", "symbol", "A", "--db", Database);
-        Assert.Equal(2, result.Code);
-        Assert.Empty(result.Output);
-        Assert.Contains("minimum", result.Error, StringComparison.OrdinalIgnoreCase);
+        if (oversizedProject)
+        {
+            using var summary = AssertBoundedJson(result);
+            Assert.Single(summary.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Contains(summary.RootElement.GetProperty("metadataSummary").GetProperty("fields").EnumerateArray(),
+                f => f.GetProperty("shortened").GetInt32() > 0);
+        }
+        else
+        {
+            Assert.Equal(2, result.Code);
+            Assert.Empty(result.Output);
+            Assert.Contains("minimum", result.Error, StringComparison.OrdinalIgnoreCase);
+        }
         using var full = AssertBoundedJson(await Run("query", "symbol", "A", "--details", "full", "--db", Database), maxChars: null);
         Assert.Single(full.RootElement.GetProperty("items").EnumerateArray());
         Assert.True(full.RootElement.GetProperty("budget").GetProperty("actualChars").GetInt32() > 12000);

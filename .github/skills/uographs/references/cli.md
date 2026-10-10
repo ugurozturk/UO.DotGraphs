@@ -1,12 +1,12 @@
 # CLI reference
 
-Target contract: UO.Graphs **0.10.0**; query/status **5**, index/doctor
+Target contract: UO.Graphs **0.11.0**; query/status **6**, index/doctor
 `contractVersion: 4`, SQLite schema **3**, context/export `formatVersion: 1`.
 Check `--help` once if the executable version is unknown (there is no `--version`).
 On an older or incompatible CLI, report the mismatch and stop dependent graph
 queries; do not install/update automatically or fall back to unlimited output.
 A compatible schema 3 snapshot needs no re-index solely for this output change.
-Full details use v5 too; they do not restore the old v4 JSON shape.
+Full details use v6 too; they do not restore the old v4/v5 JSON semantics.
 
 ## Executable and examples
 
@@ -46,7 +46,10 @@ Without a freshness flag the result reports `notChecked`; this is not fresh.
 `--check-freshness` hashes tracked inputs without MSBuild/restore, but may be
 expensive. Record its reasons and measured counts. Subsequent reads without this
 flag say `notChecked`; cite the earlier status check separately, never relabel
-those results as fresh. Check when the task requires current evidence. A selected source hash match
+those results as fresh. Check when the task requires current evidence, after relevant edits or a snapshot
+change, rather than before every read. Hashing cost scales with tracked files and
+bytes; it is not a cheap metadata-only status read. Reuse a session check with its
+snapshot and timing, while retaining each subsequent read's own freshness state. A selected source hash match
 does not establish global freshness. `--require-fresh` rejects stale/unknown with exit 9 and empty stdout;
 diagnose with status, do not repeatedly retry or drop the requirement silently.
 
@@ -66,24 +69,37 @@ not tokens; `truncated` can remove optional content.
 
 Query/status default to `--details summary --max-chars 12000`. Their JSON plus
 final LF is counted in Unicode scalars, not UTF-8 bytes or tokens. `budget` records
-the actual size; valid limits are 1–1,000,000. Summary keeps analysis limitations
-in full once, relevant project contexts for queries (including a resolved start
-with no results), and at most the first 10 projects by ID for status. Omitted
-metadata counts do not mean missing graph coverage.
+the actual size; valid limits are 1–1,000,000. Summary shows at most ten ordinal
+project contexts (only relevant projects for queries). `totalProjects` and
+`omittedProjects` describe the entire indexed scope. Project IDs, TFM,
+configuration, SDK and language remain exact in included contexts; displayed
+project paths are limited to 300 scalars. Use entity source paths for navigation.
 
 Analysis diagnostics occur only in `analysisDiagnostics`: total count, at most
-three ordinal samples of at most 300 Unicode scalars each, message truncation,
-and omitted count. Sample order is not severity. Query `diagnostics` contain
-query-specific explanations only; never infer severity/code or method ownership
-from plain diagnostic strings.
+three ordinal samples of at most 300 scalars each, message truncation, and omitted
+count. Sample order is not severity. Query `diagnostics` contain query-specific
+explanations only; never infer severity/code or ownership from diagnostic text.
 
-If the JSON exceeds budget, the CLI removes diagnostic samples, status project
-samples, then whole query results from the end. It preserves a successful first
-result and an entire path. `limits.returned` is the number sent; `truncated` and
-`limits.reasons` report `maxChars` when results were removed. An ambiguous result
-stays ambiguous even with one remaining candidate. If required metadata and the
-protected result do not fit, exit 2 has empty stdout and stderr states the minimum
-budget. Assess that size before increasing the bound.
+Other growing metadata lists (coverage limitations, fingerprint limitations,
+freshness reasons, preprocessor symbols and skipped TFMs) have at most three
+ordinal samples of at most 300 scalars each. `metadataSummary.fields` reports
+JSON Pointer `path`, original `total`, `omitted` entries and `shortened` displayed
+values. A shortened scalar path has total 1. Empty samples with omissions do not
+mean no limitations. These omissions do not set graph `truncated`. Fingerprint
+`complete=false`, coverage, freshness and checked counts are always preserved.
+When freshness reasons repeat fingerprint limitations, `reasonsReference` points
+to that single list, in summary and full output. Follow that pointer and its
+metadata summary; an empty `reasons` array alone is not the complete explanation.
+
+If JSON exceeds budget, the CLI removes diagnostic samples, then other metadata
+list samples, then project contexts, before removing whole query results from
+the end. IDs, names, source locations, relationship evidence and entire paths are
+kept intact. `limits.returned` counts items sent; `truncated` and `limits.reasons`
+report `maxChars` when results were removed. Evidence limits still report
+`evidenceTruncated` and `evidenceLimit`. Ambiguity remains ambiguity even with one
+candidate. If the minimal envelope and one whole result cannot fit, exit 2 has
+empty stdout and stderr states the required budget. Assess it before increasing
+the bound; the default remains 12,000.
 
 Full details are for a specific metadata/diagnostic investigation, not routine
 model context. Capture them only to an authorized destination when needed:

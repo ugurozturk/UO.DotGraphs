@@ -1,4 +1,4 @@
-# Graph queries — JSON v5
+# Graph queries — JSON v6
 
 Queries read a local committed snapshot without MSBuild, restore, downloads, or
 shell execution. All accept `--db <path>` (default `.uographs/graph.db`),
@@ -95,7 +95,7 @@ stdout empty and explain the error on stderr.
 
 | Field | Meaning |
 | --- | --- |
-| `schemaVersion` | Query contract version **5** |
+| `schemaVersion` | Query contract version **6** |
 | `snapshotId` | Analysis ID of the snapshot read |
 | `analysisContext` | Snapshot/input/root, versions, policy and related compact project contexts; full adds all project details |
 | `completeness` | Analysis coverage/limitations, independent of query truncation |
@@ -114,7 +114,7 @@ source ranges/hashes, reasons, bound targets, and candidates survive round trips
 Queries add no random IDs or timestamps; identical snapshot/options are deterministic.
 
 JSON v3 find fields `results/relationships/occurrences` are historical. Current
-consumers use `items[].entity` and traversal `items[].path[]`. Index/doctor retain `contractVersion: 4`; status uses `contractVersion: 5`.
+consumers use `items[].entity` and traversal `items[].path[]`. Index/doctor retain `contractVersion: 4`; status uses `contractVersion: 6`.
 Status `schemaVersion` means
 SQLite schema **3**, not query schema. Freshness adds its own cost/limitation data.
 
@@ -130,24 +130,35 @@ combining it with explicit `--max-chars` returns exit 2 and empty stdout.
 are the first three messages in ordinal order, each at most 300 Unicode scalars;
 `truncated` marks a shortened message. This order is not severity ranking. No
 severity, diagnostic code or related method is inferred from plain text.
-Analysis limitations occur once in `completeness.limitations`, in full text.
+Analysis limitations occur once in `completeness.limitations`. In summary this
+is a sample, as are dependency fingerprint limitations, freshness reasons,
+preprocessor symbols and skipped TFMs: at most three ordinal strings, each at
+most 300 scalars. `metadataSummary.fields` identifies each sampled list by JSON
+Pointer `path`, with original `total`, `omitted` entries and `shortened` displayed
+values. Project paths are also clipped at 300 scalars (total 1 when shortened).
+Do not use a shortened project path as a filesystem path. Original values are
+available with full details; returned entity source locations stay intact.
 
-Query project contexts cover `resolvedStart`, `resolvedTarget`, returned items,
-and their complete evidence paths, even when a resolved query returns no items.
-Each short context contains ID/path, TFM/configuration, SDK/language version,
-preprocessor symbols and skipped TFMs. Status shows the first ten projects by ID.
-`totalProjects` and `omittedProjects` report the scope; `metadataSummary` reports
-omitted diagnostics/projects and whether detailed project metadata was omitted.
-These counts do not indicate graph coverage or missing relationships.
+Summary project contexts are the first ten by ordinal ID, restricted for queries
+to resolved endpoints, items and their evidence paths. They contain exact ID,
+TFM/configuration, SDK/language, plus sampled preprocessor/skipped-TFM lists.
+`totalProjects` and `omittedProjects` describe the entire indexed scope. Metadata
+omissions are separate from coverage and graph truncation. Fingerprint `complete`,
+granularity, snapshot/input/root/generator policy and freshness state remain exact.
+Identical freshness/fingerprint explanation lists are stored once: an empty
+`freshnessCheck.reasons` with `reasonsReference` points to the fingerprint list.
+Consumers must follow this JSON Pointer in summary and full output.
 
-When necessary, the writer removes diagnostic samples, then status project
-samples, then whole query items from the tail. Query removal sets `truncated`
-and `limits.reasons: ["maxChars", ...]`; `limits.returned` counts actual items.
+When needed, the writer removes diagnostic samples, other metadata list samples,
+then project contexts before pruning whole query items from the tail. Query
+removal sets `truncated` and `limits.reasons: ["maxChars", ...]`; `limits.returned`
+counts actual items. Metadata reduction alone never sets those graph flags.
 At least one complete item remains for nonempty queries (including ambiguous
 candidates), and a path remains intact. Ambiguity/outcome/exit codes never change
 because candidates were removed. Source locations, hashes, confidence, reasons
-and path steps are never sliced. If mandatory metadata plus that item cannot fit,
-exit 2 leaves stdout empty and stderr states the minimum required budget.
+and path steps are never sliced. Evidence-limit truncation is unchanged and
+explicit. If mandatory scope metadata plus that item cannot fit, exit 2 leaves
+stdout empty and stderr states the minimum required budget.
 
 ```sh
 uographs status --details full --db 'DB'
@@ -155,7 +166,7 @@ uographs query callers 'SYMBOL_ID' --details full --db 'DB'
 ```
 
 Full returns every original analysis diagnostic and every project metadata field
-once. Traversal/result/evidence limits still apply. See [the v5 migration](MIGRATION-0.10.md)
+once. Traversal/result/evidence limits still apply. See [the v6 migration](MIGRATION-0.11.md)
 for consumer changes; full does not restore the old v4 envelope.
 
 ## SQLite behavior

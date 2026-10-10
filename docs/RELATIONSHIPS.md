@@ -1,7 +1,7 @@
 # Semantic relationship contract
 
 The authoritative kind/direction table is `RelationshipContract.Definitions` in
-`src/UO.Graphs.Core/Relationships.cs`. Current query JSON is **v5**, SQLite schema
+`src/UO.Graphs.Core/Relationships.cs`. Current query JSON is **v6**, SQLite schema
 **3**, and declaration identity **v2**. Phase 3 introduced the semantic edges;
 its former JSON v3/SQLite v2 output is preserved only in historical records.
 
@@ -91,7 +91,7 @@ Unknown schemas are not overwritten; status can read supported legacy schemas,
 but current queries require re-indexing schemas 1/2.
 
 Index/status report relationshipCount and occurrenceCount. Current find returns
-v5 query items, not the old Phase 3 adjacent relationship arrays. Use traversal
+v6 query items, not the old Phase 3 adjacent relationship arrays. Use traversal
 `items[].path[]`, context, or export for relationship/occurrence evidence. See
 [QUERIES](QUERIES.md) and [CONTEXT-EXPORT](CONTEXT-EXPORT.md).
 

@@ -120,7 +120,7 @@ Phase9RefitRealPackageKeepsSamePathServicesSeparateInContextAndExport.
 
 ## Persistence and traversal
 
-Source **0.10.0** uses query/status JSON **5**, SQLite **3**, delivery **1**. Optional Framework,
+Source **0.11.0** uses query/status JSON **6**, SQLite **3**, delivery **1**. Optional Framework,
 ModelMapping, and HttpContract metadata is atomically stored in existing JSON
 payloads. Nine additional relationship directions are fixed in RelationshipContract
 and its test. Dependencies/path/impact/context/export retain existing budgets and

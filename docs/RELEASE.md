@@ -1,6 +1,6 @@
 # Distribution and release readiness
 
-Package **UO.Graphs.Cli**, command **uographs**, source version **0.10.0**. Query/status envelope 5, index/doctor 4,
+Package **UO.Graphs.Cli**, command **uographs**, source version **0.11.0**. Query/status envelope 6, index/doctor 4,
 SQLite 3, and context/export 1 are unchanged. Phase 11 hardened the existing scope;
 it added no new analysis domain or hosted service.
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:uographs:cli-envelope:5",
-  "title": "UO.Graphs CLI envelopes (query/status 5, index/doctor 4, context/export 1)",
+  "$id": "urn:uographs:cli-envelope:6",
+  "title": "UO.Graphs CLI envelopes (query/status 6, index/doctor 4, context/export 1)",
   "description": "Envelope compatibility schema; nested graph metadata remains extensible. NDJSON lines, help and stderr are not JSON documents governed by this schema. Confidence and evidence contracts are documented separately.",
   "oneOf": [
     {
@@ -27,7 +27,7 @@
       ],
       "properties": {
         "schemaVersion": {
-          "const": 5
+          "const": 6
         },
         "command": {
           "enum": [
@@ -168,8 +168,37 @@
           "required": [
             "omittedDiagnostics",
             "omittedProjects",
-            "projectDetailsOmitted"
-          ]
+            "projectDetailsOmitted",
+            "fields"
+          ],
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "total",
+                  "omitted",
+                  "shortened"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "integer"
+                  },
+                  "omitted": {
+                    "type": "integer"
+                  },
+                  "shortened": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "additionalProperties": true
@@ -337,7 +366,7 @@
       ],
       "properties": {
         "contractVersion": {
-          "const": 5
+          "const": 6
         },
         "command": {
           "const": "status"
@@ -439,8 +468,37 @@
           "required": [
             "omittedDiagnostics",
             "omittedProjects",
-            "projectDetailsOmitted"
-          ]
+            "projectDetailsOmitted",
+            "fields"
+          ],
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "total",
+                  "omitted",
+                  "shortened"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "integer"
+                  },
+                  "omitted": {
+                    "type": "integer"
+                  },
+                  "shortened": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
         },
         "completeness": {
           "type": "object",

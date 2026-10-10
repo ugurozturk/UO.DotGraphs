@@ -122,6 +122,9 @@ measurements. Current release gates remain in [STATUS](STATUS.md).
 
 ## Query/status v5 output measurements — 2026-10-10
 
+Historical baseline. The v6 metadata-budget follow-up and current before/after
+measurements are in [STATUS](STATUS.md#metadata-budget-follow-up--2026-10-10).
+
 CLI 0.10.0 Release, macOS 27.0.1 ARM64, SDK 10.0.201, runtime 10.0.5.
 Each row lists three separate CLI processes; timer covers startup, reads, JSON
 serialization and pipe collection. Cache was not flushed; concurrent integration

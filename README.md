@@ -9,17 +9,17 @@ service, API key, or telemetry. It never automatically restores or downloads
 project dependencies. Indexing requires explicit permission to evaluate the
 project with MSBuild through `--trust-project`.
 
-Source version: **0.10.0**. Package: **UO.Graphs.Cli**. Query/status JSON: **5**;
+Source version: **0.11.0**. Package: **UO.Graphs.Cli**. Query/status JSON: **6**;
 SQLite schema: **3**; context/export format: **1**; declaration identity: **2**.
 Linux CI and local macOS checks have passed; Windows, physical offline validation,
 and real Copilot E2E remain open. See [verified status](docs/STATUS.md).
 
 ## Install
 
-The skill in this checkout requires CLI 0.10.0 / query-status v5. The published
+The skill in this checkout requires CLI 0.11.0 / query-status v6. The published
 0.9.0 installation commands below are historical release instructions and are
 not compatible with the new skill. Build/package this source in an explicitly
-authorized environment to validate 0.10.0 locally; no 0.10.0 publication is claimed.
+authorized environment to validate 0.11.0 locally; no 0.11.0 publication is claimed.
 
 The published version 0.9.0 was pushed to NuGet by the
 [verified publishing workflow](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37997326843).
@@ -160,9 +160,10 @@ writer lease protect publication; readers see one consistent generation.
 
 Help is plain text; export uses the selected format. Other successful commands
 emit one JSON document to stdout; progress and errors go to stderr. Fatal errors
-leave stdout empty. Query JSON v5 contains `snapshotId`, `analysisContext`,
+leave stdout empty. Query JSON v6 contains `snapshotId`, `analysisContext`,
 `completeness`, `stale`, `truncated`, `items`, `diagnostics`, effective options,
-limits, and outcome. Index/status/doctor carry `contractVersion: 4`.
+limits, and outcome. Status carries `contractVersion: 6`; index/doctor retain
+`contractVersion: 4`.
 The status `schemaVersion` describes SQLite, currently 3.
 
 Old SQLite schemas 1/2 can be inspected with status; current query/context/export
@@ -174,7 +175,7 @@ are not reinterpreted as identity v2. See the
 | Exit | Meaning |
 | --- | --- |
 | 0 | Success, including partial snapshots and empty queries; inspect coverage |
-| 2 | Invalid command/options/input/root, or insufficient context envelope budget |
+| 2 | Invalid command/options/input/root, or insufficient query/status/context envelope budget |
 | 3 | Missing trust flag; target not evaluated |
 | 4 | Missing SDK/assets/index prerequisite, unsupported input, or missing TFM selection |
 | 5 | No analyzable compilation or fatal analysis failure |
@@ -278,5 +279,5 @@ NuGet prerequisites, the existing Python installer, and verification boundaries.
 | Actual results and license inventory | [STATUS](docs/STATUS.md), [DEPENDENCIES](docs/DEPENDENCIES.md), [notices](THIRD-PARTY-NOTICES.txt) |
 
 Query/status now default to compact JSON within 12,000 Unicode scalar values.
-See [0.10 migration](docs/MIGRATION-0.10.md) for `--details full`, character budgets,
+See [0.10 migration](docs/MIGRATION-0.11.md) for `--details full`, character budgets,
 and skill compatibility. This source change does not publish a NuGet package.

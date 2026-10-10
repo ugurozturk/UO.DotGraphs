@@ -43,8 +43,11 @@ def main():
                 ('callees-default', ['query', 'callees', args.symbol]),
                 ('status-default', ['status']),
                 ('context-default', ['context', args.symbol]),
+                ('status-bounded', ['status', '--max-chars', str(args.max_chars)]),
                 ('symbol-bounded', ['query', 'symbol', args.symbol, '--max-chars', str(args.max_chars)]),
                 ('callers-bounded', ['query', 'callers', args.symbol, '--max-chars', str(args.max_chars)]),
+                ('find-full', ['query', 'find', args.find, '--limit', '1', '--details', 'full']),
+                ('callees-full', ['query', 'callees', args.symbol, '--details', 'full']),
                 ('symbol-full', ['query', 'symbol', args.symbol, '--details', 'full']),
                 ('callers-full', ['query', 'callers', args.symbol, '--details', 'full']),
                 ('status-full', ['status', '--details', 'full'])]
@@ -67,6 +70,16 @@ def main():
                             'snapshot': document.get('snapshotId', document.get('analysis', {}).get('id')),
                             'outcome': document.get('outcome'), 'returned': document.get('limits', {}).get('returned'),
                             'stderr': result.stderr.decode('utf-8')})
+    # Equal query/evidence limits must yield equal answers even when traversal is
+    # incomplete. Only explicit output-budget pruning may change returned items.
+    for name in ('find', 'symbol', 'callers', 'callees'):
+        compact_path = args.evidence / f'{name}-default-1.stdout'
+        full_path = args.evidence / f'{name}-full-1.stdout'
+        if compact_path.stat().st_size and full_path.stat().st_size:
+            compact = json.loads(compact_path.read_text())
+            full = json.loads(full_path.read_text())
+            if 'maxChars' not in compact['limits']['reasons']:
+                assert compact['items'] == full['items'], name + ' answer differs'
     after = digest(db)
     snapshots = sorted({r['snapshot'] for r in results if r['snapshot'] is not None})
     manifest = {'environment': environment, 'database': str(db), 'observedSnapshots': snapshots, 'sha256Before': before,

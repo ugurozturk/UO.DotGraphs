@@ -1,8 +1,8 @@
 # VS Code GitHub Copilot skill
 
-The skill is a terminal consumer of the independent **uographs 0.10.0** CLI. It adds
+The skill is a terminal consumer of the independent **uographs 0.11.0** CLI. It adds
 no MCP server, hosted service, API key, telemetry, LLM dependency, or runtime
-download. Tool packaging is available; see [RELEASE](RELEASE.md). Query/status JSON 5, index/doctor 4, SQLite 3 and context/export 1
+download. Tool packaging is available; see [RELEASE](RELEASE.md). Query/status JSON 6, index/doctor 4, SQLite 3 and context/export 1
 are the supported contracts. Full details do not restore the old v4 JSON shape.
 
 ## Shared plugin installation
@@ -11,7 +11,7 @@ Copilot and Codex use the same portable Agent Plugins package at
 [plugins/uographs](../plugins/uographs/README.md). The Copilot marketplace catalog
 is [.github/plugin/marketplace.json](../.github/plugin/marketplace.json); it points
 to `./plugins/uographs`. The Codex catalog stays separate but selects the same
-package. Plugin version **0.2.0** is independent of the CLI NuGet version.
+package. Plugin version **0.3.0** is independent of the CLI NuGet version.
 
 Install the CLI separately if missing; do not reinstall an existing usable tool:
 
@@ -66,12 +66,12 @@ repository skill. Both use the same instructions and CLI reference. Existing
 standalone skills are not removed; preserve customizations and review duplicates.
 Each target repository requires its own prepared index and explicit scope.
 
-The skill targets CLI **0.10.0** and query/status **v5**. Query/status default to
+The skill targets CLI **0.11.0** and query/status **v6**. Query/status default to
 a 12,000 Unicode-scalar summary including the final LF. An exact ID can go
 directly to the needed semantic query; a simple definition lookup can use `rg`
 or a small find when uographs is requested. Help, doctor, status, freshness and
 context are conditional on the task. Full diagnostics are reserved for a specific
-investigation; `--details full` still uses v5 and cannot combine with
+investigation; `--details full` still uses v6 and cannot combine with
 `--max-chars`. Older incompatible CLIs do not trigger automatic upgrades or
 unbounded-output fallbacks. Existing schema 3 indexes remain readable.
 

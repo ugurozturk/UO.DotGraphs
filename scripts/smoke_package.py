@@ -86,8 +86,8 @@ def main():
             text = (out / f"{name}.stdout").read_text()
             data = json.loads(text)
             version = data["contractVersion"] if name == "status" else data["schemaVersion"]
-            if version != 5 or data["budget"]["actualChars"] != len(text) or len(text) > 12000:
-                raise RuntimeError(f"Packaged {name} violated the v5 default budget")
+            if version != 6 or data["budget"]["actualChars"] != len(text) or len(text) > 12000:
+                raise RuntimeError(f"Packaged {name} violated the v6 default budget")
         for name in ("callers", "callees"):
             if not json.loads((out / f"{name}.stdout").read_text())["items"]:
                 raise RuntimeError(f"Packaged {name} lost HelloGraph relationships")

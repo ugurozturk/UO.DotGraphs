@@ -34,8 +34,9 @@ internal static class Cli
 
         Query/status output: --details summary|full (default summary), --max-chars <1..1000000>.
         Summary defaults to 12000 Unicode scalars including final LF; compact JSON.
+        Summary samples metadata before pruning whole results; omissions are explicit.
         Full includes all analysis metadata/diagnostics once; incompatible with --max-chars.
-        Query/status contract 5; index/doctor 4; context/export 1; SQLite schema 3.
+        Query/status contract 6; index/doctor 4; context/export 1; SQLite schema 3.
         Query options: --direction outgoing|incoming|both --edge-types CALLS,USES_TYPE,...
                        --depth <0..100> --limit <1..10000> --include-inferred
                        --max-edges <1..1000000> --evidence-limit <1..1000>

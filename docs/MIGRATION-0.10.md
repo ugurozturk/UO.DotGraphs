@@ -1,5 +1,7 @@
 # CLI 0.10 migration
 
+Historical v5 contract. For the current source, see [CLI 0.11 / v6](MIGRATION-0.11.md).
+
 CLI 0.10.0 changes query JSON `schemaVersion` and status `contractVersion` to **5**.
 Index/doctor remain **4**, context/export **1**, declaration identity **2**, and
 SQLite **3**. Existing schema 3 indexes can be read without re-indexing. A stored
