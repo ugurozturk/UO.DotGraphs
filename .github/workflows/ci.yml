@@ -51,6 +51,14 @@ jobs:
               -p:Version="$PACKAGE_VERSION" -m:1 -nr:false \
               --logger "trx;LogFileName=$suite.trx" --results-directory artifacts/test-results
           done
+      - name: Upload failed test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: failed-test-results
+          if-no-files-found: ignore
+          retention-days: 14
+          path: artifacts/test-results/*.trx
       - name: Check licenses and release tooling
         run: |
           python3 scripts/audit_licenses.py --check

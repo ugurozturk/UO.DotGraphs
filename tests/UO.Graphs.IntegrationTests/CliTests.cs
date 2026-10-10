@@ -158,16 +158,67 @@ public sealed partial class CliTests : IDisposable
     {
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = workingDirectory, RedirectStandardOutput = true,
             RedirectStandardError = true, UseShellExecute = false };
-        foreach (var arg in new[] { "run", "--project", Path.Combine(Root, "src/UO.Graphs.Cli/UO.Graphs.Cli.csproj"), "--configuration", BuildConfiguration, "--no-build", "--no-restore", "--" }.Concat(arguments))
-            start.ArgumentList.Add(arg);
+        // CI already built these binaries. Avoid an extra `dotnet run`/MSBuild launcher.
+        foreach (var arg in new[] { CliAssembly }.Concat(arguments)) start.ArgumentList.Add(arg);
         start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
-        using var process = Process.Start(start)!;
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        try { await process.WaitForExitAsync(timeout.Token); }
-        catch { process.Kill(entireProcessTree: true); throw; }
-        return (process.ExitCode, await stdout, await stderr);
+        // A single SDK preparation process may legitimately take up to 120 seconds.
+        // Match the existing packaged-index smoke deadline; read commands stay bounded at 90.
+        var budget = TimeSpan.FromSeconds(arguments.FirstOrDefault() == "index" ? 180 : 90);
+        return await RunProcessAsync(start, budget);
+    }
+
+    private static async Task<(int Code, string Output, string Error)> RunProcessAsync(ProcessStartInfo start, TimeSpan budget)
+    {
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start CLI test process.");
+        var watch = Stopwatch.StartNew();
+        var output = new StringBuilder();
+        var error = new StringBuilder();
+        using var deadline = new CancellationTokenSource(budget);
+        var stdout = CaptureAsync(process.StandardOutput, output, deadline.Token);
+        var stderr = CaptureAsync(process.StandardError, error, deadline.Token);
+        var timedOut = false;
+        var cleanup = "process exited";
+        try
+        {
+            // Also bound pipe draining: a child can keep a pipe open after the CLI exits.
+            await Task.WhenAll(process.WaitForExitAsync(deadline.Token), stdout, stderr);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested) { timedOut = true; }
+        finally
+        {
+            deadline.Cancel();
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    cleanup = "process tree kill requested";
+                }
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (InvalidOperationException) { cleanup = "process exited during cleanup"; }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or TimeoutException)
+            { cleanup = "cleanup failed: " + ex.Message; }
+        }
+        if (timedOut)
+            throw new TimeoutException(FormattableString.Invariant($"CLI test process exceeded {budget.TotalSeconds:F1}s (elapsed {watch.Elapsed.TotalSeconds:F1}s; PID {process.Id}; {cleanup}).") +
+                $"\nWorking directory: {start.WorkingDirectory}\nArgv: {JsonSerializer.Serialize(new[] { start.FileName }.Concat(start.ArgumentList))}" +
+                $"\nSTDOUT tail:\n{Tail(output)}\nSTDERR tail:\n{Tail(error)}");
+        return (process.ExitCode, output.ToString(), error.ToString());
+
+        static async Task CaptureAsync(StreamReader reader, StringBuilder capture, CancellationToken token)
+        {
+            var buffer = new char[4096];
+            int count;
+            while ((count = await reader.ReadAsync(buffer.AsMemory(), token)) != 0)
+                capture.Append(buffer, 0, count);
+        }
+        static string Tail(StringBuilder capture)
+        {
+            const int maxChars = 16000;
+            var start = Math.Max(0, capture.Length - maxChars);
+            return (start > 0 ? "[earlier output omitted]\n" : "") + capture.ToString(start, capture.Length - start);
+        }
     }
 
     private static string Canonical(params string[] parts) => "uographs:2:" + string.Concat(parts.Select(p => $"{Encoding.UTF8.GetByteCount(p)}:{p}"));

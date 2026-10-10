@@ -9,6 +9,65 @@ No new product analysis domain, service, or runtime dependency was added by hard
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
 
+## Ubuntu Phase 8 CI timeout follow-up — 2026-10-10
+
+[Ubuntu 24.04 run 38061767404](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/38061767404)
+at `57668d6` passed 55 unit tests and 124/125 integration tests. The sole failure,
+`RealMediatrAndMassTransitPackagesKeepMultipleConsumersAndUnresolvedTargets`,
+was a `TaskCanceledException` in `CliTests.RunIn` after exactly 90 seconds, called
+by `IndexPath` before the test's semantic assertions. This was a test-process
+deadline, not a failed consumer-count or unresolved-target assertion. The old
+helper discarded progress on timeout, so the blocked/slow internal index stage
+cannot be established from that CI log. Cold startup, disk and CPU causes remain
+unproven; local success does not establish that Ubuntu is fixed.
+
+Changes are restricted to the test harness, its regression tests, CI diagnostic
+artifact retention and this status entry:
+
+- Run the already-built CLI DLL directly, removing the `dotnet run` SDK launcher.
+- Give `index` 180 seconds, aligned with the existing packaged-index smoke limit;
+  read commands retain 90 seconds. The old 90-second whole-process limit was
+  shorter than the product's 120-second individual SDK-preparation limit.
+- Cover process exit and stdout/stderr draining with one deadline. Timeout reports
+  include argv, working directory, PID, elapsed time, the last 16,000 characters
+  of each stream and bounded cleanup status. Formatting is culture-independent.
+- Request reachable process-tree termination and wait up to ten seconds for the
+  parent to exit. Reparented descendants after an already-exited parent are not
+  claimed to be contained; that requires external isolation.
+- Upload `failed-test-results` TRX artifacts when a CI step fails. The verified
+  package artifact and publishing gates remain unchanged.
+
+Two real-process regression tests cover preserved Unicode/escape/newline output,
+nonzero exit code, timeout diagnostics under `tr-TR`, and parent termination.
+The initial local focused run found the culture-dependent `3,0` formatting issue
+(3 passed / 1 failed); invariant formatting fixed it and the final run passed.
+No product indexer, semantic extraction, output budget, dependency, or version was
+changed. Consumer counts and unresolved-target assertions are unchanged.
+
+| Check | Result for this follow-up |
+| --- | --- |
+| macOS ARM64 Release build | PASS, zero warnings/errors; 22.40 s initial, 2.84 s final |
+| Two-processor focused VSTest | PASS **4/4**, zero skipped, 17 s; reported CI test, two new process tests and existing semantic round-trip |
+| Full final integration | PASS **127/127**, zero failed/skipped, 10 m 25 s on macOS ARM64 |
+| Actual CLI callers read | PASS: one HelloGraph caller, schema 5, 8,747 scalars within 12,000, existing snapshot ec638832847c43d2846c3ed6cfd41712 |
+| Workflow YAML / git diff --check | PASS |
+| Updated Ubuntu run / failure-artifact upload | NOT RUN; no commit, push or workflow trigger performed |
+
+Evidence: `.uographs/ubuntu-phase8-fix/ci-failed.log`, `focused.trx`,
+`focused-final.trx`, `full-final.trx`, `callers-smoke.json`. Commands:
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+DOTNET_PROCESSOR_COUNT=2 dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~RealMediatrAndMassTransitPackagesKeepMultipleConsumersAndUnresolvedTargets|FullyQualifiedName~CliProcess' --logger 'trx;LogFileName=focused-final.trx' --results-directory .uographs/ubuntu-phase8-fix
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=full-final.trx' --results-directory .uographs/ubuntu-phase8-fix
+dotnet src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll query callers 'HelloGraph.Domain.Greeter.Greet(string)' --db .uographs/bounded-output/validation/hello.db
+```
+
+Changed files: `tests/UO.Graphs.IntegrationTests/CliTests.cs`,
+`tests/UO.Graphs.IntegrationTests/CliProcessTests.cs`, `.github/workflows/ci.yml`,
+`docs/STATUS.md`. Suggested commit:
+`fix: bound CLI test deadlines and preserve CI timeout diagnostics`.
+
 ## Bounded query/status output and short skill workflow — 2026-10-10
 
 Implemented CLI 0.10.0, query/status v5 and plugin 0.2.0. Query/status now project
