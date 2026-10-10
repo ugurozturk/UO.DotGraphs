@@ -16,7 +16,7 @@ checks below. Historical failures remain evidence of their original environments
 
 | Check | Latest verified result |
 | --- | --- |
-| macOS ARM64 Release build | PASS, SDK 10.0.201; plugin distribution validation build 5.29 s, zero warnings/errors |
+| macOS ARM64 Release build | PASS, SDK 10.0.201; Copilot distribution validation build 22.56 s, zero warnings/errors |
 | macOS standard VSTest | PASS **55/55 unit**, **99/99 integration**, zero skipped; integration 11m54s |
 | Linux CI at `5b52a01` | PASS **55/55 unit**, **99/99 integration**, zero skipped; Release build, audit, pack, installed-tool fresh index/query/context passed |
 | NuGet Trusted Publishing | PASS; verified 0.9.0 artifact pushed through OIDC on 2026-10-10 |
@@ -26,10 +26,70 @@ checks below. Historical failures remain evidence of their original environments
 | Windows / on-prem Azure execution | NOT RUN |
 | Physical offline / physical disk exhaustion | NOT RUN |
 | 1000-project analysis / peak process-tree RSS / true cache-cold measurement | NOT RUN |
-| Real VS Code/Copilot E2E | NOT RUN; file-format and CLI tests are separate |
+| Copilot marketplace artifacts | PASS **12/12** artifact tests; both catalogs select the shared plugin **0.1.1** |
+| Copilot CLI plugin installation / VS Code discovery / model E2E | NOT RUN; standalone Copilot CLI unavailable on PATH, live VS Code session not exercised |
 | Codex skill packaging / installation | PASS on macOS; repository/template parity, installer negatives, actual-package extraction/install |
 | Codex plugin installation / discovery | PASS on macOS, Codex CLI 0.162.1; local marketplace, isolated profile, installed/enabled plugin and user-scope discovery in two repositories |
 | Model-driven Codex E2E | NOT RUN; model selection/answers remain separate from verified installation/discovery |
+
+## Copilot marketplace for the shared agent plugin — 2026-10-10
+
+The new `.github/plugin/marketplace.json` catalog exposes
+`uographs@uographs` for Copilot and selects the same `./plugins/uographs`
+package as Codex. Plugin version is now **0.1.1**; the .NET CLI remains **0.9.1**.
+Skill wording is agent-neutral, with byte parity across both repository skills,
+both standalone templates, and the shared plugin. No CLI source, runtime
+dependency, service, MCP server, automatic restore/indexing, or permission
+setting changed.
+
+After the catalog is published to GitHub, the installation commands are:
+
+```sh
+copilot plugin marketplace add ugurozturk/UO.DotGraphs
+copilot plugin install uographs@uographs
+```
+
+[Copilot installation](COPILOT-SKILL.md) also documents Agent Host chat commands,
+local VS Code user `chat.pluginLocations`, and invocation as
+`/uographs:uographs`. CLI installation and each repository's prepared graph
+remain separate prerequisites. No user settings or global installation changed.
+No commit, push, publication, or model request was made.
+
+Commands run on macOS ARM64 with prepared SDK/assets (no restore):
+
+```sh
+python3 -B scripts/test_skill.py --evidence .uographs/copilot-plugin/artifacts.json
+python3 -B scripts/test_ci_package.py
+python3 -B scripts/audit_licenses.py --check
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/copilot-plugin/packages
+python3 -B scripts/smoke_package.py .uographs/copilot-plugin/packages --version 0.9.1 --evidence .uographs/copilot-plugin/package-smoke
+git diff --check
+```
+
+| Check | Actual result |
+| --- | --- |
+| Release build | PASS **22.56 s**, zero warnings/errors |
+| Skill/plugin artifact tests | PASS **12/12**, **0.147 s**; shared catalog identity/version/source and owner negatives, template parity and existing installer checks |
+| Package gate tests / license inventory | PASS **10/10**, **0.015 s**; **143** locked package/version entries, no dependency changes |
+| Installed NuGet package smoke | PASS local-feed install/help/doctor/trust refusal/fresh HelloGraph index/query/context; index subprocess **9.998 s** |
+| Copilot CLI plugin installation | NOT RUN; `copilot` is absent on PATH. VS Code's bundled SDK package is not an available standalone CLI |
+| Live VS Code discovery / model E2E | NOT RUN; documented loading routes and artifact tests do not establish live host acceptance |
+| Codex plugin 0.1.1 live reinstall | NOT RUN; previous 0.1.0 installation/discovery evidence below remains historical |
+| Full .NET suite / Linux / Windows / live CI | NOT RUN for this catalog/docs change; earlier results remain historical |
+| Remote marketplace installation | NOT RUN; new catalog has not been pushed |
+
+Evidence: `.uographs/copilot-plugin/artifacts.json` and
+`package-smoke/commands.json`, with per-command stdout/stderr in that directory.
+The validation NuGet package predates final doc/status updates and was not
+published. Existing CI runs the extended artifact tests without adding a Copilot
+runtime dependency.
+
+Changed: `.github/plugin/marketplace.json`; shared plugin manifest/README and
+skill/reference; both repository skills and standalone templates;
+`scripts/test_skill.py`; README and docs/COPILOT-SKILL, CODEX-SKILL, ARCHITECTURE,
+PRODUCT, STATUS.
+Suggested commit: `feat(copilot): add marketplace for shared uographs plugin`
 
 ## Codex plugin marketplace distribution — 2026-10-10
 

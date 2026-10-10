@@ -106,7 +106,7 @@ shortest path. Neither means runtime reachability. A `notFound` or
 | 10 / 130 | Writer busy / cancelled; report, no automatic retry or lock deletion. |
 
 If the executable cannot be launched, report CLI unavailable. `doctor` checks
-the local runtime/SDK, not target project readiness, Copilot authorization or
+the local runtime/SDK, not target project readiness, agent authorization or
 network isolation. No MCP, server, provider account or API key is needed by CLI.
 
 Phase 11 distribution uses the local `UO.Graphs.Cli` .NET tool package and the same

@@ -1,0 +1,14 @@
+{
+  "name": "uographs",
+  "owner": {
+    "name": "Ugur Ozturk"
+  },
+  "plugins": [
+    {
+      "name": "uographs",
+      "description": "Use the local UO.Graphs CLI to inspect C#/.NET symbols, source-backed relationships and change impact. Requires a separately installed CLI and prepared graph index.",
+      "version": "0.1.1",
+      "source": "./plugins/uographs"
+    }
+  ]
+}

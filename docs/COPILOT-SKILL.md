@@ -5,6 +5,70 @@ no MCP server, hosted service, API key, telemetry, LLM dependency, or runtime
 download. Tool packaging is available; see [RELEASE](RELEASE.md). JSON 4 / SQLite 3 /
 delivery 1 remain unchanged by the integration.
 
+## Shared plugin installation
+
+Copilot and Codex use the same portable Agent Plugins package at
+[plugins/uographs](../plugins/uographs/README.md). The Copilot marketplace catalog
+is [.github/plugin/marketplace.json](../.github/plugin/marketplace.json); it points
+to `./plugins/uographs`. The Codex catalog stays separate but selects the same
+package. Plugin version **0.1.1** is independent of the CLI NuGet version.
+
+Install the CLI separately if missing; do not reinstall an existing usable tool:
+
+```sh
+dotnet tool install --global UO.Graphs.Cli
+uographs --help
+uographs doctor
+```
+
+After the marketplace catalog is published to GitHub, use Copilot CLI:
+
+```sh
+copilot plugin marketplace add ugurozturk/UO.DotGraphs
+copilot plugin install uographs@uographs
+copilot plugin list --json
+```
+
+For local CLI installation testing, replace the first command's source with the
+absolute path to this checkout. These are setup commands, not runtime downloads.
+They register the marketplace and install the skill, not the CLI or graph index.
+See the [official Copilot plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference).
+
+VS Code supports discovering Copilot CLI-installed plugins. In an Agent Host
+Copilot session, the chat equivalents are:
+
+```text
+/plugin marketplace add ugurozturk/UO.DotGraphs
+/plugin install uographs@uographs
+/plugin list
+```
+
+Manage the plugin through the same interface used to install it: slash commands
+and the Agent Customizations editor can use separate plugin inventories.
+For local development without GitHub publication, add this entry to VS Code user
+settings, preserving existing plugin locations:
+
+```json
+{
+  "chat.pluginLocations": {
+    "/absolute/path/to/UO.DotGraphs/plugins/uographs": true
+  }
+}
+```
+
+Use user settings for availability across repositories. Plugin support must be
+available under the VS Code version and organization policy. No setting or
+permission is changed by the plugin itself. These paths follow the
+[VS Code plugin documentation](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
+
+Invoke `/uographs:uographs` for the plugin copy; `/uographs` remains the standalone
+repository skill. Both use the same instructions and CLI reference. Existing
+standalone skills are not removed; preserve customizations and review duplicates.
+Each target repository requires its own prepared index and explicit scope.
+
+**Live Copilot CLI installation / VS Code discovery / model E2E: NOT RUN.**
+See [STATUS](STATUS.md) for current verification evidence and prerequisites.
+
 ## Dated format evidence
 
 The following installed files were inspected on **2026-10-09** on macOS. These are
@@ -27,7 +91,7 @@ activation, organizational permission, model access, or actual skill selection.
 Settings were not changed and no graph/source was sent to Copilot.
 **Real Copilot E2E: NOT RUN.**
 
-## Distribution and installation
+## Standalone repository installation
 
 1. Confirm the destination repository's Copilot, skill, terminal, and AI data policy.
    Disabled MCP does not authorize another tool. Respect any restriction without

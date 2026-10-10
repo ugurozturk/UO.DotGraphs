@@ -31,7 +31,9 @@ The marketplace name and plugin name are both `uographs`. Install once for your
 Codex user account and use it across repositories, subject to repository and
 organization policy. The plugin bundles the existing skill and CLI reference;
 it adds no MCP server, hook, setup skill, authentication integration, or automatic
-NuGet download. Plugin version 0.1.0 is independent of the CLI NuGet version.
+NuGet download. Plugin version 0.1.1 is independent of the CLI NuGet version.
+Copilot uses the same plugin through its own marketplace catalog; see
+[COPILOT-SKILL](COPILOT-SKILL.md).
 GitHub installation is not verified until those files are available remotely.
 
 For local package development, replace the first command with:

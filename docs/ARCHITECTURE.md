@@ -151,9 +151,11 @@ costs rather than assumed budgets.
 The Copilot and Codex skills and their byte-matched standalone templates are
 terminal consumers. The installer selects `.github/skills` (default) or
 `.agents/skills` (`--agent codex`), refuses existing/symlinked destinations, and
-changes no permissions. Codex can also install the skill through the repository's
-marketplace as the `uographs@uographs` plugin. The plugin contains only a manifest,
-documentation, license, and a byte-matched copy of the standalone Codex skill;
+changes no permissions. Codex and Copilot can also install the shared
+`uographs@uographs` plugin through their respective repository marketplace catalogs
+(`.agents/plugins/marketplace.json` and `.github/plugin/marketplace.json`). The plugin
+contains only a manifest,
+documentation, license, and a byte-matched copy of both standalone agent skills;
 its version is maintained independently of the CLI package. It uses a separately
 installed CLI and prepared index. No setup hook, network service, MCP server, or
 automatic CLI installation is added. They add no product dependency on either

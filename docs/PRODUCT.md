@@ -15,8 +15,9 @@ entire selected project closure.
 Static extractors cover Microsoft DI, ASP.NET Core, UO.Mediator, MediatR,
 MassTransit, ABP, EF Core, and Refit within documented API/version boundaries.
 The optional VS Code GitHub Copilot and Codex skills consume the independent CLI.
-Codex can install its skill once through the UO.Graphs plugin marketplace; the
-CLI and each repository's graph index remain separately prepared prerequisites.
+Codex and Copilot can install the shared skill through their UO.Graphs plugin
+marketplace catalogs; the CLI and each repository's graph index remain separately
+prepared prerequisites.
 Phase 11 added performance and failure handling improvements, tool packaging,
 and release verification. [STATUS](STATUS.md) separates implementation from
 actual acceptance and remaining gates.
@@ -67,7 +68,7 @@ agent E2E acceptance; see [COPILOT-SKILL](COPILOT-SKILL.md) and
 ## Outside the initial release scope
 
 No frontend or web graph viewer, multilingual parser, repository federation,
-watcher, plugin marketplace, or mandatory NativeAOT. No general runtime tracing
+watcher, analysis-extension marketplace, or mandatory NativeAOT. No general runtime tracing
 or guarantee of resolving every dynamic call. Analyzing DI, HTTP, messaging, ABP,
 EF Core, or Refit does not introduce those application services into UO.Graphs.
 

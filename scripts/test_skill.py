@@ -94,6 +94,20 @@ def lint_plugin(root):
             raise ValueError("Plugin skill differs from the standalone template")
 
 
+def lint_copilot_marketplace(root):
+    """Both client catalogs must select the same portable plugin and release."""
+    lint_plugin(root)
+    catalog = json.loads((root / ".github/plugin/marketplace.json").read_text())
+    manifest = json.loads((root / "plugins/uographs/plugin.json").read_text())
+    if catalog["name"] != "uographs" or not catalog.get("owner", {}).get("name") or len(catalog["plugins"]) != 1:
+        raise ValueError("Expected the uographs Copilot marketplace, owner and one plugin")
+    entry = catalog["plugins"][0]
+    if entry["source"] != "./plugins/uographs" or entry["name"] != manifest["name"]:
+        raise ValueError("Copilot and Codex must select the same plugin")
+    if entry["version"] != manifest["version"] or entry["description"] != manifest["description"]:
+        raise ValueError("Copilot catalog metadata differs from the portable plugin")
+
+
 def examples(path):
     return [shlex.split(line) for block in re.findall(r'```sh\n(.*?)```', path.read_text(encoding="utf-8"), re.S)
             for line in block.splitlines() if line.startswith("uographs ")]
@@ -161,6 +175,28 @@ class ArtifactTests(unittest.TestCase):
                     path.write_text(json.dumps(value))
                 with self.assertRaises(ValueError):
                     lint_plugin(root)
+
+    def test_copilot_marketplace_shares_the_codex_plugin(self):
+        lint_copilot_marketplace(ROOT)
+        for name in ("SKILL.md", "references/cli.md"):
+            self.assertEqual((TEMPLATE / name).read_bytes(), (CODEX_TEMPLATE / name).read_bytes())
+
+    def test_copilot_marketplace_rejects_source_identity_version_and_owner_drift(self):
+        for invalid in ("source", "name", "version", "owner"):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                shutil.copytree(ROOT / ".agents/plugins", root / ".agents/plugins")
+                shutil.copytree(ROOT / ".github/plugin", root / ".github/plugin")
+                shutil.copytree(ROOT / "plugins/uographs", root / "plugins/uographs")
+                path = root / ".github/plugin/marketplace.json"
+                value = json.loads(path.read_text())
+                if invalid == "owner":
+                    del value["owner"]
+                else:
+                    value["plugins"][0][invalid] = {"source": "../outside", "name": "other", "version": "99.0.0"}[invalid]
+                path.write_text(json.dumps(value))
+                with self.assertRaises(ValueError):
+                    lint_copilot_marketplace(root)
 
     def test_frontmatter_references_and_template_parity(self):
         for skill, template in ((SKILL, TEMPLATE), (CODEX_SKILL, CODEX_TEMPLATE)):

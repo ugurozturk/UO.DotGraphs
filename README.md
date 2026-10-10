@@ -220,18 +220,26 @@ Version comes directly from `<Version>` in `Directory.Build.props`; no run numbe
 is appended. Existing NuGet versions are skipped. See
 [release setup](docs/RELEASE.md#github-actions-and-nuget-trusted-publishing).
 
-The [Copilot skill](.github/skills/uographs/SKILL.md) uses the CLI through the
-terminal. Its [standalone template](templates/copilot/uographs/SKILL.md) can be
-installed into an authorized repository without overwriting an existing skill:
+The [shared agent plugin](plugins/uographs/README.md) supports GitHub Copilot and
+Codex. With `uographs` installed separately, install it once through Copilot CLI:
+
+```sh
+copilot plugin marketplace add ugurozturk/UO.DotGraphs
+copilot plugin install uographs@uographs
+```
+
+These commands require the Copilot catalog to be published to the remote repo.
+VS Code supports discovering Copilot CLI-installed plugins. Invoke the skill as
+`/uographs:uographs` in Copilot Chat. For local plugin loading, use VS Code user
+`chat.pluginLocations`; see [Copilot installation](docs/COPILOT-SKILL.md).
+**Live VS Code/Copilot acceptance remains NOT RUN.**
+
+The existing [standalone Copilot skill](.github/skills/uographs/SKILL.md) remains
+available for a single repository, with the same overwrite protections:
 
 ```sh
 python3 scripts/install_skill.py '/path/to/authorized/repository'
 ```
-
-Review the destination and template first. The installer does not change terminal
-permissions or bypass organizational restrictions. CLI tests and installed format
-support have been checked; **real Copilot E2E remains NOT RUN**.
-See [installation and manual acceptance](docs/COPILOT-SKILL.md).
 
 The [Codex plugin](plugins/uographs/README.md) provides the same bounded CLI
 workflow across your repositories. With `uographs` installed separately, add the
