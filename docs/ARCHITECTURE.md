@@ -148,9 +148,11 @@ NuGet publication. No runtime upload is added. [RELEASE](RELEASE.md) describes
 installation and platform evidence; [PERFORMANCE](PERFORMANCE.md) records measured
 costs rather than assumed budgets.
 
-The Copilot skill and its byte-matched standalone template are terminal consumers.
-The installer refuses existing/symlinked destinations and changes no permissions.
-They do not introduce a product dependency on Copilot. See [COPILOT-SKILL](COPILOT-SKILL.md).
+The Copilot and Codex skills and their byte-matched standalone templates are
+terminal consumers. The installer selects `.github/skills` (default) or
+`.agents/skills` (`--agent codex`), refuses existing/symlinked destinations, and
+changes no permissions. They add no product dependency on either agent. See
+[COPILOT-SKILL](COPILOT-SKILL.md) and [CODEX-SKILL](CODEX-SKILL.md).
 
 Trust does not isolate custom tasks or generators. Preparation subprocess output
 and cancellation bounds do not automatically constrain Roslyn BuildHost or

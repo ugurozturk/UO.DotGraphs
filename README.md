@@ -209,7 +209,7 @@ dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-rest
 dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- status
 ```
 
-## GitHub releases and Copilot skill
+## GitHub releases and agent skills
 
 The [CI workflow](.github/workflows/ci.yml) restores locked dependencies, builds
 and tests Release, audits licenses, packs, and installs the actual tool to test
@@ -232,6 +232,19 @@ Review the destination and template first. The installer does not change termina
 permissions or bypass organizational restrictions. CLI tests and installed format
 support have been checked; **real Copilot E2E remains NOT RUN**.
 See [installation and manual acceptance](docs/COPILOT-SKILL.md).
+
+The [Codex skill](.agents/skills/uographs/SKILL.md) provides the same bounded CLI
+workflow. Install its [standalone template](templates/codex/uographs/SKILL.md) into
+another authorized repository with:
+
+```sh
+python3 scripts/install_skill.py '/path/to/authorized/repository' --agent codex
+```
+
+This creates `.agents/skills/uographs`; the skill is already present in this
+checkout. Invoke it as `$uographs` in Codex. Installation preserves existing skills
+and `AGENTS.md`. **Real Codex E2E remains NOT RUN**; see
+[Codex installation and acceptance](docs/CODEX-SKILL.md).
 
 ## Documentation
 

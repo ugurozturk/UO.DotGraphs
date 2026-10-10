@@ -15,6 +15,8 @@ TOOL = "tools/net10.0/any/"
 REQUIRED = {
     "LICENSE", "README.md", "THIRD-PARTY-NOTICES.txt", "licenses/NUglify-1.21.17.txt",
     "templates/copilot/uographs/SKILL.md", "templates/copilot/uographs/references/cli.md",
+    "templates/codex/uographs/SKILL.md", "templates/codex/uographs/references/cli.md",
+    "scripts/install_skill.py",
     "docs/schemas/cli-envelope.schema.json", "scripts/safe_export.py",
     TOOL + "DotnetToolSettings.xml", TOOL + "uographs.dll", TOOL + "uographs.deps.json",
     TOOL + "uographs.runtimeconfig.json", TOOL + "UO.Graphs.Core.dll",

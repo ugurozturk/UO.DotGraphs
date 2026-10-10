@@ -62,6 +62,8 @@ def main():
         for required in ['LICENSE', 'THIRD-PARTY-NOTICES.txt', 'README.md', 'tools/net10.0/any/DotnetToolSettings.xml',
                          'tools/net10.0/any/BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll',
                          'templates/copilot/uographs/SKILL.md', 'templates/copilot/uographs/references/cli.md',
+                         'templates/codex/uographs/SKILL.md', 'templates/codex/uographs/references/cli.md',
+                         'scripts/install_skill.py',
                          'docs/history/PHASE10.md', 'docs/schemas/cli-envelope.schema.json', 'scripts/safe_export.py']:
             assert required in names, required
         assert any('runtimes/osx-arm64/native/' in p for p in names)

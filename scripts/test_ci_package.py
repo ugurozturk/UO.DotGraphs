@@ -79,6 +79,14 @@ class PackageGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing payload"):
             verify(self.root, "0.9.1", COMMIT)
 
+    def test_missing_codex_distribution_is_rejected(self):
+        for name in ("templates/codex/uographs/SKILL.md",
+                     "templates/codex/uographs/references/cli.md", "scripts/install_skill.py"):
+            with self.subTest(missing=name):
+                self.package(omit=name)
+                with self.assertRaisesRegex(ValueError, "Missing payload"):
+                    verify(self.root, "0.9.1", COMMIT)
+
     def test_fixture_database_and_traversal_are_rejected(self):
         for extra in (TOOL + "Volo.Abp.Core.dll", "graph.db", "../secret.txt"):
             with self.subTest(extra=extra):

@@ -27,6 +27,70 @@ checks below. Historical failures remain evidence of their original environments
 | Physical offline / physical disk exhaustion | NOT RUN |
 | 1000-project analysis / peak process-tree RSS / true cache-cold measurement | NOT RUN |
 | Real VS Code/Copilot E2E | NOT RUN; file-format and CLI tests are separate |
+| Codex skill packaging / installation | PASS on macOS; repository/template parity, installer negatives, actual-package extraction/install |
+| Real Codex E2E | NOT RUN; discovery/model behavior is separate from CLI tests |
+
+## Codex skill support — 2026-10-10
+
+User-requested Codex support adds `.agents/skills/uographs/` and its byte-matched
+`templates/codex/uographs/` distribution, each containing SKILL.md and the CLI
+reference. The existing installer accepts `--agent codex`; its default remains
+Copilot. It preserves existing skill directories, AGENTS.md, and Copilot content,
+and rejects symlinks at every Codex destination level, including dangling links.
+No personal/global skill or permission setting was changed.
+
+The .NET tool package includes the Codex template; both package gates require it
+and the installer. CI now runs the skill artifact tests. This is an optional CLI
+consumer extension, not a new analysis phase or runtime dependency. Version stays
+0.9.0; the local validation package was not published and does not replace the
+previously published artifact. Repository skill discovery follows the dated
+[official documentation](https://learn.chatgpt.com/docs/build-skills); actual Codex
+selection and model behavior remain **NOT RUN**. See [CODEX-SKILL](CODEX-SKILL.md).
+
+Commands run on macOS ARM64 with prepared SDK/assets (no restore):
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+python3 -B scripts/test_skill.py --db .uographs/docs-english/validation/graph.db --evidence .uographs/codex-skill/reads.json
+python3 -B scripts/test_ci_package.py
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~Phase10ApprovedIncrementalSkillWorkflowAcrossProcesses --logger 'trx;LogFileName=skill-workflow.trx' --results-directory .uographs/codex-skill
+dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/codex-skill/packages
+python3 -B scripts/verify_ci_package.py .uographs/codex-skill/packages --version 0.9.0 --commit b4c9c0d937b67274888751e73f4137976f41fe4c
+python3 -B scripts/audit_licenses.py --check
+python3 -B scripts/install_skill.py --help
+git diff --check
+```
+
+| Check | Actual result |
+| --- | --- |
+| Release build | PASS **23.54 s**, zero warnings/errors |
+| Skill artifacts / real CLI reads | PASS **13/13**, **14.803 s**, **48 CLI subprocesses**; prepared Debug binary and actual existing HelloGraph snapshot |
+| Package gate tests | PASS **10/10**, including missing Codex template/reference/installer negatives; synthetic test packages |
+| Release incremental skill integration | PASS **1/1**, zero skipped, **16 s**; separate-process index/update/status/find/context/callers |
+| Actual local package | PASS package identity/layout and source parity; extracted installer successfully installed both Codex files into a temporary repository |
+| License inventory | PASS **143** locked package/version entries; no dependency change |
+| YAML / docs / whitespace | PASS Ruby YAML.safe_load for both new frontmatters, stdlib skill lint, eight documents / 63 local links / balanced fences, git diff --check |
+| Bundled skill-creator quick_validate.py | NOT RUN: Python PyYAML unavailable (ModuleNotFoundError); no package installed; independent YAML parse and repository lint passed |
+| Full .NET suite / Linux / Windows / live CI / Codex E2E | NOT RUN for this change; earlier results above remain historical evidence |
+
+Evidence: `.uographs/codex-skill/reads.json`, `skill-workflow.trx`, `package.json`,
+and `packages/UO.Graphs.Cli.0.9.0.nupkg`. Package SHA-256:
+`c9317d932b029495ca5c586c138aff3de5e8777a4558553751382b3d78137ec9`.
+The temporary extraction check used Python zipfile, copied only the packaged
+installer/Codex template, executed the extracted installer with `--agent codex`,
+and compared installed bytes to the source template. The package was built from
+an uncommitted tree before this STATUS record; its repository commit metadata
+is not proof that the new skill was committed or published.
+
+Existing English documentation changes were preserved; commit `b4c9c0d` appeared
+during this task. The agent did not commit/push/publish.
+
+Changed: `.agents/skills/uographs/{SKILL.md,references/cli.md}`;
+`templates/codex/uographs/{SKILL.md,references/cli.md}`; `scripts/install_skill.py`,
+`test_skill.py`, `test_ci_package.py`, `verify_ci_package.py`, `verify_release.py`;
+`src/UO.Graphs.Cli/UO.Graphs.Cli.csproj`; `.github/workflows/ci.yml`; README;
+`docs/CODEX-SKILL.md`, PRODUCT, ARCHITECTURE, STATUS.
+Suggested commit: `feat(skills): add Codex skill and safe repository installation`
 
 ## English documentation refresh — 2026-10-10
 

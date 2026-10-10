@@ -23,6 +23,8 @@ from install_skill import install
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / ".github/skills/uographs"
 TEMPLATE = ROOT / "templates/copilot/uographs"
+CODEX_SKILL = ROOT / ".agents/skills/uographs"
+CODEX_TEMPLATE = ROOT / "templates/codex/uographs"
 CLI = ROOT / "src/UO.Graphs.Cli/bin/Debug/net10.0/uographs.dll"
 COMMANDS = []
 DATABASE = None
@@ -88,11 +90,15 @@ def run(args, expected=0, env=None, timeout=45):
 
 class ArtifactTests(unittest.TestCase):
     def test_frontmatter_references_and_template_parity(self):
-        for folder in (SKILL, TEMPLATE):
-            lint(folder)
-        for source in SKILL.rglob("*"):
-            if source.is_file():
-                self.assertEqual(source.read_bytes(), (TEMPLATE / source.relative_to(SKILL)).read_bytes())
+        for skill, template in ((SKILL, TEMPLATE), (CODEX_SKILL, CODEX_TEMPLATE)):
+            for folder in (skill, template):
+                lint(folder)
+            for source in skill.rglob("*"):
+                if source.is_file():
+                    self.assertEqual(source.read_bytes(), (template / source.relative_to(skill)).read_bytes())
+        # Both hosts document the same CLI contract; shared real-command tests cover it.
+        self.assertEqual(examples(SKILL / "references/cli.md"),
+                         examples(CODEX_SKILL / "references/cli.md"))
 
     def test_linter_rejects_invalid_frontmatter_and_missing_references(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -134,6 +140,61 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 install(root)
             self.assertEqual([], list(target.iterdir()))
+
+    def test_codex_installer_cli_coexists_and_preserves_customization(self):
+        with tempfile.TemporaryDirectory(prefix="uographs codex skill ") as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_text("User instructions")
+            copilot = install(root)
+            before = {p.relative_to(copilot): p.read_bytes()
+                      for p in copilot.rglob("*") if p.is_file()}
+            command = [os.sys.executable, "-B", str(ROOT / "scripts/install_skill.py"),
+                       str(root), "--agent", "codex"]
+            result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            self.assertEqual(0, result.returncode, result.stderr)
+            folder = root / ".agents/skills/uographs"
+            self.assertEqual(str(folder.resolve()), result.stdout.strip())
+            lint(folder)
+            for source in CODEX_TEMPLATE.rglob("*"):
+                if source.is_file():
+                    self.assertEqual(source.read_bytes(),
+                                     (folder / source.relative_to(CODEX_TEMPLATE)).read_bytes())
+            (folder / "SKILL.md").write_text("User customization")
+            again = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            self.assertEqual(1, again.returncode)
+            self.assertIn("already exists", again.stderr)
+            self.assertEqual("User customization", (folder / "SKILL.md").read_text())
+            self.assertEqual("User instructions", (root / "AGENTS.md").read_text())
+            self.assertEqual(before, {p.relative_to(copilot): p.read_bytes()
+                                      for p in copilot.rglob("*") if p.is_file()})
+
+    def test_codex_installer_refuses_symlinks_at_each_destination_level(self):
+        for relative in (".agents", ".agents/skills", ".agents/skills/uographs"):
+            for dangling in (False, True):
+                with self.subTest(path=relative, dangling=dangling), tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    outside = root / "outside"
+                    if not dangling:
+                        outside.mkdir()
+                        (outside / "keep.txt").write_text("Keep")
+                    link = root / relative
+                    link.parent.mkdir(parents=True, exist_ok=True)
+                    link.symlink_to(outside, target_is_directory=True)
+                    with self.assertRaises(ValueError):
+                        install(root, agent="codex")
+                    self.assertTrue(link.is_symlink())
+                    if dangling:
+                        self.assertFalse(outside.exists())
+                    else:
+                        self.assertEqual(["keep.txt"], [p.name for p in outside.iterdir()])
+                        self.assertEqual("Keep", (outside / "keep.txt").read_text())
+
+    def test_unknown_agent_is_rejected_without_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaises(ValueError):
+                install(root, agent="unknown")
+            self.assertEqual([], list(root.iterdir()))
 
     def test_examples_are_bounded_and_no_shell_or_approval_metadata(self):
         commands = examples(SKILL / "references/cli.md")
@@ -314,5 +375,5 @@ if __name__ == "__main__":
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps({"testsRun": result.testsRun, "failures": len(result.failures),
                                         "errors": len(result.errors), "commands": COMMANDS,
-                                        "copilotE2E": "NOT RUN"}, indent=2) + "\n")
+                                        "copilotE2E": "NOT RUN", "codexE2E": "NOT RUN"}, indent=2) + "\n")
     raise SystemExit(0 if result.wasSuccessful() else 1)

@@ -27,5 +27,6 @@
     <None Include="../../docs/schemas/*.json" Pack="true" PackagePath="docs/schemas/" />
     <None Include="../../scripts/install_skill.py;../../scripts/safe_export.py" Pack="true" PackagePath="scripts/" />
     <None Include="../../templates/copilot/**/*" Pack="true" PackagePath="templates/copilot/" />
+    <None Include="../../templates/codex/**/*" Pack="true" PackagePath="templates/codex/" />
   </ItemGroup>
 </Project>

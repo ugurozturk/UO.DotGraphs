@@ -4,15 +4,22 @@ import argparse
 from pathlib import Path
 import shutil
 
-TEMPLATE = Path(__file__).resolve().parents[1] / "templates/copilot/uographs"
+ROOT = Path(__file__).resolve().parents[1]
+AGENT_DIRECTORIES = {"copilot": ".github", "codex": ".agents"}
+TEMPLATE = ROOT / "templates/copilot/uographs"
 
 
-def install(repository: Path, template: Path = TEMPLATE) -> Path:
+def install(repository: Path, template: Path | None = None, *, agent: str = "copilot") -> Path:
+    if agent not in AGENT_DIRECTORIES:
+        raise ValueError(f"Unsupported agent: {agent}")
+    if template is None:
+        template = ROOT / "templates" / agent / "uographs"
     repository = repository.resolve(strict=True)
     if not repository.is_dir():
         raise ValueError("Target must be an existing repository directory")
-    destination = repository / ".github/skills/uographs"
-    for part in (repository / ".github", repository / ".github/skills", destination):
+    agent_root = repository / AGENT_DIRECTORIES[agent]
+    destination = agent_root / "skills/uographs"
+    for part in (agent_root, destination.parent, destination):
         if part.is_symlink():
             raise ValueError(f"Refusing symlink destination: {part}")
     if destination.exists():
@@ -37,9 +44,11 @@ def install(repository: Path, template: Path = TEMPLATE) -> Path:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repository", type=Path, help="Existing, authorized target repository")
+    parser.add_argument("--agent", choices=AGENT_DIRECTORIES, default="copilot",
+                        help="Skill host (default: copilot); codex uses .agents/skills")
     args = parser.parse_args()
     try:
-        print(install(args.repository))
+        print(install(args.repository, agent=args.agent))
     except (OSError, ValueError) as error:
         parser.exit(1, f"Skill not installed: {error}\n")
 

@@ -56,6 +56,7 @@ jobs:
           python3 scripts/audit_licenses.py --check
           python3 scripts/test_release_tools.py
           python3 scripts/test_ci_package.py
+          python3 scripts/test_skill.py --evidence .uographs/ci-skill-tests.json
       - name: Pack the tested Release output
         run: dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:Version="$PACKAGE_VERSION" -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output artifacts/packages
       - name: Verify package identity and contents

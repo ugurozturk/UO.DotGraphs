@@ -14,7 +14,7 @@ entire selected project closure.
 
 Static extractors cover Microsoft DI, ASP.NET Core, UO.Mediator, MediatR,
 MassTransit, ABP, EF Core, and Refit within documented API/version boundaries.
-The optional VS Code GitHub Copilot skill consumes the independent CLI.
+The optional VS Code GitHub Copilot and Codex skills consume the independent CLI.
 Phase 11 added performance and failure handling improvements, tool packaging,
 and release verification. [STATUS](STATUS.md) separates implementation from
 actual acceptance and remaining gates.
@@ -45,10 +45,11 @@ tasks, and other project-defined code can execute. Trust is neither a sandbox no
 a network block; custom build code and permitted generators may perform their own
 I/O. See [SECURITY](SECURITY.md).
 
-The Copilot skill follows terminal and organizational policy. Passing output to
-Copilot crosses a separate data boundary: a local graph does not make the model
-offline. Skill format checks and CLI tests are distinct from real Copilot E2E
-acceptance; see [COPILOT-SKILL](COPILOT-SKILL.md).
+The Copilot and Codex skills follow terminal and organizational policy. Passing
+output to either agent crosses a separate data boundary: a local graph does not
+make the model offline. Skill format checks and CLI tests are distinct from real
+agent E2E acceptance; see [COPILOT-SKILL](COPILOT-SKILL.md) and
+[CODEX-SKILL](CODEX-SKILL.md).
 
 ## Accuracy contract
 
