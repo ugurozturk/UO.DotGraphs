@@ -11,28 +11,47 @@ project with MSBuild through `--trust-project`.
 
 Source version: **0.11.0**. Package: **UO.Graphs.Cli**. Query/status JSON: **6**;
 SQLite schema: **3**; context/export format: **1**; declaration identity: **2**.
-Linux CI and local macOS checks have passed; Windows, physical offline validation,
-and real Copilot E2E remain open. See [verified status](docs/STATUS.md).
+Validation is recorded per version and platform in [verified status](docs/STATUS.md).
+Full release acceptance remains incomplete, including Windows, physical offline
+validation, and real Copilot E2E.
+
+## What you can inspect
+
+- C# symbols, declarations, compile-time calls, type dependencies, inheritance,
+  implementations, and potential change impact.
+- Microsoft DI registrations and ASP.NET Core endpoint declarations.
+- UO.Mediator, MediatR, and MassTransit message/handler contracts and candidates.
+- ABP service/module/repository contracts, EF Core mapping declarations, and
+  Refit HTTP client contracts.
+- Bounded context for an assistant, or JSON, NDJSON, Mermaid, and DOT exports.
+
+Framework support has explicit API/version limits. The linked support matrices
+under [Documentation](#documentation) describe those limits; static evidence
+does not establish runtime activation, message delivery, or HTTP routing.
 
 ## Install
 
-The skill in this checkout requires CLI 0.11.0 / query-status v6. The published
-0.9.0 installation commands below are historical release instructions and are
-not compatible with the new skill. Build/package this source in an explicitly
-authorized environment to validate 0.11.0 locally; no 0.11.0 publication is claimed.
+As checked on **2026-10-10**, the latest version listed in the
+[NuGet version index](https://api.nuget.org/v3-flatcontainer/uo.graphs.cli/index.json)
+is **0.10.0**. This README describes **0.11.0 source**; the skill in this checkout
+requires CLI 0.11.0 / query-status v6. The published 0.10.0 tool uses v5 and is
+not compatible with that skill. Use [Build from source](#build-from-source) for
+0.11.0; its publication is not claimed here.
 
-The published version 0.9.0 was pushed to NuGet by the
-[verified publishing workflow](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37997326843).
 A .NET 10 runtime is required to run the tool. Indexing also requires the target's
 selected SDK, reference packs, and previously restored assets.
 
+To install the published 0.10.0 tool:
+
 ```sh
-dotnet tool install --global UO.Graphs.Cli --version 0.9.0 --source https://api.nuget.org/v3/index.json
+dotnet tool install --global UO.Graphs.Cli --version 0.10.0 --source https://api.nuget.org/v3/index.json
 uographs --help
 uographs doctor
 ```
 
-Update with `dotnet tool update --global UO.Graphs.Cli`. If the command is missing,
+Update an existing installation with
+`dotnet tool update --global UO.Graphs.Cli --version 0.10.0 --source https://api.nuget.org/v3/index.json`.
+If the command is missing,
 check the global tool directory in PATH: `$HOME/.dotnet/tools` on macOS/Linux or
 `%USERPROFILE%\.dotnet\tools` on Windows. The version appears in `--help`;
 there is no `--version` option.
@@ -41,7 +60,7 @@ For a repository-local installation, run `dotnet new tool-manifest` once if no
 manifest exists, then:
 
 ```sh
-dotnet tool install --local UO.Graphs.Cli --version 0.9.0 --source https://api.nuget.org/v3/index.json
+dotnet tool install --local UO.Graphs.Cli --version 0.10.0 --source https://api.nuget.org/v3/index.json
 dotnet tool run uographs --help
 # On another machine, install the version recorded in the committed manifest:
 dotnet tool restore
@@ -80,6 +99,34 @@ Replace quoted placeholders with IDs returned by `find`. Exact, unique names als
 work. Ambiguous names return candidates and require selection; the first candidate
 is never selected silently. Path returns one bounded shortest path. Impact reports
 potential static dependencies with evidence, not guaranteed runtime effects.
+
+## Query and status output
+
+Query and status default to compact JSON with a **12,000 Unicode-scalar** budget,
+including serialized escapes and the final newline. This is a character budget,
+not a token count. Increase it for a larger answer, or request full metadata for
+a specific investigation:
+
+```sh
+uographs query callers '<symbol-id>' --max-chars 20000
+uographs status --details full
+uographs query symbol '<symbol-id>' --details full
+```
+
+In v6, summary output samples diagnostics, limitations, and project metadata
+before removing whole result items. `metadataSummary.fields` records sampled
+fields and their omitted/shortened counts; `budget.actualChars` records output
+size. Metadata omissions are separate from graph `truncated` and coverage.
+An empty sampled list does not prove the absence of limitations. Follow
+`freshnessCheck.reasonsReference` when it points to shared fingerprint reasons.
+
+`--details full` preserves original metadata without a character cap. It still
+uses v6 and respects query traversal/result/evidence limits; it cannot be combined
+with `--max-chars`. If the minimum envelope and an indivisible result cannot fit,
+the command returns exit 2 with empty stdout and reports the required budget.
+
+Existing schema 3 indexes need no rebuild for 0.11.0. Consumers of v5 must account
+for metadata sampling; see [0.11 migration](docs/MIGRATION-0.11.md).
 
 ## Context and export
 
@@ -219,15 +266,20 @@ dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-rest
 
 The [CI workflow](.github/workflows/ci.yml) restores locked dependencies, builds
 and tests Release, audits licenses, packs, and installs the actual tool to test
-index/query/context. A successful first-party `main` push triggers
+index/query/context. Automatic runs require a change matching `src/**/*.cs` on a
+`main` push or pull request. README, documentation, tests, scripts, configuration,
+and version-only changes do not trigger CI by themselves; manual dispatch is
+available. A successful first-party `main`-push CI run triggers
 [publishing](.github/workflows/publish-nuget.yml) of that verified artifact through
 NuGet Trusted Publishing. PR and manually triggered CI runs do not publish.
 Version comes directly from `<Version>` in `Directory.Build.props`; no run number
 is appended. Existing NuGet versions are skipped. See
 [release setup](docs/RELEASE.md#github-actions-and-nuget-trusted-publishing).
 
-The [shared agent plugin](plugins/uographs/README.md) supports GitHub Copilot and
-Codex. With `uographs` installed separately, install it once through Copilot CLI:
+The [shared agent plugin](plugins/uographs/README.md), version **0.3.0**, supports
+GitHub Copilot and Codex and requires a separately prepared **CLI 0.11.0 / v6**.
+The NuGet 0.10.0 installation above does not satisfy this requirement. With the
+compatible CLI available, install the plugin once through Copilot CLI:
 
 ```sh
 copilot plugin marketplace add ugurozturk/UO.DotGraphs
@@ -277,7 +329,7 @@ NuGet prerequisites, the existing Python installer, and verification boundaries.
 | ABP, EF Core, Refit | [ABP-EF-REFIT](docs/ABP-EF-REFIT.md) |
 | Delivery, measurements, trust | [RELEASE](docs/RELEASE.md), [PERFORMANCE](docs/PERFORMANCE.md), [SECURITY](docs/SECURITY.md) |
 | Actual results and license inventory | [STATUS](docs/STATUS.md), [DEPENDENCIES](docs/DEPENDENCIES.md), [notices](THIRD-PARTY-NOTICES.txt) |
+| CLI 0.11 / JSON v6 migration | [MIGRATION-0.11](docs/MIGRATION-0.11.md) |
 
-Query/status now default to compact JSON within 12,000 Unicode scalar values.
-See [0.10 migration](docs/MIGRATION-0.11.md) for `--details full`, character budgets,
-and skill compatibility. This source change does not publish a NuGet package.
+UO.Graphs is licensed under [MIT](LICENSE). Third-party components retain their
+own licenses; see [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES.txt).
