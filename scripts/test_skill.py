@@ -330,16 +330,17 @@ class ArtifactTests(unittest.TestCase):
 
     def test_examples_are_bounded_and_no_shell_or_approval_metadata(self):
         commands = examples(SKILL / "references/cli.md")
-        self.assertEqual(17, len(commands))
+        self.assertEqual(21, len(commands))
         for command in commands:
             self.assertFalse(set(command) & {";", "|", "&&", "||", ">", "--full", "--allow-generators"})
             if command[1] in ("query", "status") and "full" in command:
                 self.assertNotIn("--max-chars", command)
             if command[1] == "query":
-                self.assertIn("--limit", command)
+                if command[2] != "symbol":
+                    self.assertIn("--limit", command)
                 if "full" not in command:
                     self.assertIn("--max-chars", command)
-                if command[2] != "find":
+                if command[2] not in ("find", "symbol"):
                     self.assertIn("--max-edges", command)
             if command[1] == "context":
                 self.assertIn("--max-chars", command)
@@ -373,6 +374,10 @@ class CliTests(unittest.TestCase):
 
     def values(self):
         return {"DB": str(self.db), "TEXT": "Greet", "SYMBOL_ID": self.symbols["Greet"]["id"],
+                # Translate illustrative application names to real HelloGraph declarations.
+                "App.Dental.TreatmentPlans.TreatmentPlanAppService": "HelloGraph.Domain.Greeter",
+                "App.Dental.TreatmentPlans.TreatmentPlanAppService.AddItemAsync(System.Guid, App.Dental.TreatmentPlans.CreateTreatmentPlanItemDto)": self.symbols["Greet"]["qualifiedName"],
+                "TreatmentPlan": "Greet",
                 "TARGET_ID": self.symbols["Welcome"]["id"], "INPUT": str(self.directory / "Missing.csproj"),
                 "MESSAGE_ID": self.symbols["Greet"]["id"], "SNAPSHOT_ID": self.snapshot,
                 "ROOT": str(self.directory), "CONFIGURATION": "Debug", "TFM": "net10.0"}
@@ -415,6 +420,15 @@ class CliTests(unittest.TestCase):
                             self.assertTrue(any("Greet" in (s.get("text") or "") for s in result["snippets"]))
                     if args[:2] == ["query", "callers"]:
                         self.assertTrue(any(x["symbol"]["id"] == values["TARGET_ID"] for x in result["items"]))
+                    if args[:2] == ["query", "symbol"]:
+                        self.assertEqual("ok", result["outcome"])
+                        self.assertEqual(1, len(result["items"]))
+                        selected = result["items"][0]["entity"]
+                        if args[2] == "HelloGraph.Domain.Greeter":
+                            self.assertEqual(args[2], selected["qualifiedName"])
+                            self.assertEqual("type", selected["kind"])
+                        else:
+                            self.assertEqual(values["SYMBOL_ID"], selected["id"])
 
     def test_call_path_and_source_evidence(self):
         greet, welcome = self.symbols["Greet"], self.symbols["Welcome"]

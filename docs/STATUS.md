@@ -1,6 +1,6 @@
 # Verified status
 
-Last updated: **2026-10-10**.
+Last updated: **2026-10-11**.
 
 **Phase 11 hardening is implemented; full release acceptance remains incomplete.**
 Source **UO.Graphs 0.12.0**, package **UO.Graphs.Cli**, command **uographs**.
@@ -8,6 +8,49 @@ Standard query/status JSON **6**, opt-in compact query **1**, index/doctor **4**
 No new product analysis domain, service, or runtime dependency was added by hardening.
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
+
+## Skill definition lookup routing — 2026-10-11
+
+Definition lookup keeps `rg` for simple name/file searches and uses `query symbol`
+directly for an exact qualified type name, full method display signature or exact
+ID. Small `query find` calls are for partial names; their limited results neither
+guarantee exact-match priority nor prove absence. Namespace/project/signature
+disambiguation is required before selecting an ambiguous candidate. Context,
+relationship queries and freshness checks remain task-dependent.
+
+Updated both repository skills (`.agents/skills/uographs`, `.github/skills/uographs`),
+both standalone templates (`templates/codex/uographs`, `templates/copilot/uographs`)
+and the portable plugin (`plugins/uographs/skills/uographs`): `SKILL.md` and
+`references/cli.md` are byte-identical across all five copies. The four new lookup
+examples are alternatives, with explicit `DB`/`SYMBOL_ID` placeholders.
+`scripts/test_skill.py` now checks 21 reference commands, applies traversal bounds
+only to traversal queries and verifies direct type/signature/ID resolution.
+Application example names are mapped to real HelloGraph declarations for these
+consumer checks; this is not evidence about an application graph.
+
+Validation on macOS:
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+python3 -B scripts/test_skill.py --evidence .uographs/definition-skill/artifacts.json
+python3 -B scripts/test_skill.py --cli src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll --db .uographs/docs-english/validation/graph.db --evidence .uographs/definition-skill/reads.json
+git diff --check
+```
+
+- Release build: PASS, **22.28 s**, zero warnings/errors.
+- Artifact/frontmatter/reference/parity tests: PASS **12/12**.
+- Artifact and real CLI consumer tests: PASS **17/17**, **14.429 s**, using a
+  temporary SQLite backup of the existing HelloGraph snapshot; no re-index.
+- Markdown checks: PASS, ten skill/reference files, five local links, balanced
+  fences and 30 shell blocks parsed with `bash -n`; whitespace check passed.
+- Generic skill-creator `quick_validate.py`: **NOT RUN**, import blocked by missing
+  PyYAML; no dependency installed. Repository frontmatter/parity checks passed.
+- Full .NET test suites, other platforms and agent-host E2E: **NOT RUN** for this
+  skill/documentation-only change. CLI source/search ordering, installed plugin
+  cache and package versions are unchanged. No restore, index update, real skill
+  installation, commit or push; installer tests use temporary destinations only.
+
+Suggested commit: `docs(skill): resolve known symbols directly for definition lookup`
 
 ## AI query output revision — 2026-10-10
 

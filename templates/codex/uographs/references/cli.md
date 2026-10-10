@@ -26,6 +26,36 @@ properly quoted values before execution. `DB` is the explicit local database;
 `TEXT` a narrow symbol search; `SYMBOL_ID` and `TARGET_ID` exact selected IDs.
 Examples use POSIX quoting; use the terminal's own argument rules on other shells.
 
+Definition lookup alternatives, not a mandatory command chain: use `query symbol`
+directly for a known exact qualified type name, full method display signature or
+symbol ID. `Namespace.Type.Method` alone may not identify a method; use its full
+display signature (including parameters) or exact ID. Use a small `query find`
+only when the name is partial. Do not assume find ranks exact matches first:
+limited results may omit the exact match, so absence from that page does not
+prove the symbol is missing from the index. Disambiguate by namespace, project
+and signature to establish the exact ID; never automatically select the first
+ambiguous candidate. Then read the relevant source. Context, callers/callees and
+freshness checks are not prerequisites for finding a definition.
+
+`DB` and `SYMBOL_ID` below are placeholders for the local database and an exact
+symbol ID selected from a previous result.
+
+```sh
+# Exact qualified class name is known:
+uographs query symbol 'App.Dental.TreatmentPlans.TreatmentPlanAppService' --max-chars 12000 --db 'DB'
+
+# Full method signature is known:
+uographs query symbol 'App.Dental.TreatmentPlans.TreatmentPlanAppService.AddItemAsync(System.Guid, App.Dental.TreatmentPlans.CreateTreatmentPlanItemDto)' --max-chars 12000 --db 'DB'
+
+# Exact ID is known from a previous result:
+uographs query symbol 'SYMBOL_ID' --max-chars 12000 --db 'DB'
+
+# Only a partial name is known:
+uographs query find 'TreatmentPlan' --view compact --limit 10 --max-chars 12000 --db 'DB'
+```
+
+Other task-dependent invocations:
+
 ```sh
 uographs --help
 uographs doctor
@@ -41,7 +71,8 @@ uographs query path 'SYMBOL_ID' 'TARGET_ID' --depth 3 --limit 10 --max-edges 100
 
 These are alternatives, not a mandatory command chain. Query metadata normally
 provides scope; use status only for additional scope/index diagnosis and doctor
-only for runtime/SDK trouble. Start with find only when an exact ID is not known.
+only for runtime/SDK trouble. Start with find only when the name is partial;
+use symbol directly for a known exact qualified type name, full method signature or ID.
 Use context only if surrounding relations or snippets are useful.
 
 Without a freshness flag the result reports `notChecked`; this is not fresh.

@@ -13,9 +13,14 @@ when needed. Check `--help` once if CLI version/compatibility is unknown; use
 
 ## Choose the shortest useful route
 
-- **Find a definition:** use `rg` when a name/file lookup suffices. If the user
-  specifically requests uographs, run a small `query find`, then read the relevant
-  source. Context and relationship queries are optional.
+- **Find a definition:** use `rg` when a name/file lookup suffices.
+  When using uographs and the exact qualified type name, full method signature,
+  or symbol ID is known, use `query symbol` directly. Otherwise run a small
+  `query find`, disambiguate by namespace/project/signature, then read the
+  relevant source. Limited find results may omit the exact match; absence
+  from that page is not evidence that the symbol is missing. Never select
+  the first ambiguous candidate automatically. Context and relationship
+  queries are optional.
 - **Understand a workflow:** read the short method body and relevant tests first.
   Use graph evidence for uncertain dependencies, interface bindings or mediator links.
   For direct calls use `--view compact --calls exclude-properties`; this explicitly
@@ -76,5 +81,5 @@ CALLS names a compile-time target; static evidence is not a runtime guarantee.
 Metadata samples omitted or shortened for size are separate from missing graph
 coverage and traversal truncation. Read `metadataSummary.fields`; an empty sampled
 list does not prove no limitations. Follow `freshnessCheck.reasonsReference` when
-present. A small find result is sufficient for a definition lookup; do not run
+present. A resolved symbol is sufficient for a definition lookup; do not run
 context or callers/callees unless the task needs that information.
