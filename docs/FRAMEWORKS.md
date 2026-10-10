@@ -1,131 +1,120 @@
-# Faz 7 — Microsoft DI ve ASP.NET Core
+# Microsoft DI and ASP.NET Core analysis
 
-UO.Graphs 0.7.0, JSON v4 / SQLite schema 3 / delivery v1. Bu faz **statik
-bildirimleri** çıkarır. Kayıt metodunun çağrıldığını, endpoint'in host'ta aktive
-edildiğini veya hangi implementation'ın çözüleceğini kanıtlamaz. İncelenen assembly
-Reflection ile yüklenmez; uygulama, container, HTTP host veya database çalıştırılmaz.
+These extractors record **static declarations**, not execution, container membership,
+resolution, or host activation. UO.Graphs does not load the analyzed assembly through
+reflection or start its application, container, HTTP host, or database. Current
+product 0.9.0 retains JSON v4 / SQLite 3 / delivery 1; these extractors began in Phase 7.
 
-## Extractor sözleşmesi
+## Extractor contract
 
-Roslyn katmanında iç `IFrameworkExtractor` yalnız `Id` ve
-`Extract(FrameworkExtractionContext)` içerir. `microsoft-di-v1` ardından
-`aspnet-core-v1` statik olarak kayıtlıdır. DI modülü aynı compilation'da görülen
-servis tiplerini HTTP modülüne implicit parametre **adayı** için aktarır. Başka
-projelerdeki kayıtlar bu aday kümesine sessizce taşınmaz.
+Internal `IFrameworkExtractor` exposes Id and Extract(FrameworkExtractionContext).
+The statically registered microsoft-di-v1 runs before aspnet-core-v1. DI shares
+service types seen in the same compilation for implicit HTTP parameter candidates;
+registrations from other projects are not silently imported into that set.
 
-Context, seçilen compilation/document'ları, mevcut symbol identity resolver'ını,
-kanıt üretimini ve graph builder'ı sağlar. Depolama veya host erişimi yoktur.
-Modüller gerçek framework metadata referanslarıyla bellekte test edilir; gerçek
-MSBuild/CLI/SQLite akışı ayrıca integration testidir. Plugin discovery, assembly
-loader, marketplace, DI container altyapısı veya yeni ürün projesi yoktur.
+The context supplies compilation/documents, identity resolution, evidence, and
+graph building, without storage/host access. Tests use real framework metadata
+references; MSBuild/CLI/SQLite integration is checked separately. No plugin loader,
+marketplace, DI infrastructure, or extra product project is introduced.
 
-## İlişki anlamları
+## Relationship meanings
 
-| İlişki | Yön ve güven anlamı |
+| Kind | Direction and confidence |
 | --- | --- |
-| `REGISTERS` | Kayıt bildirimi → bildirilen service type. Exact, kayıt çağrısının statik argümanını belirtir; execution veya container üyeliği değildir. |
-| `IMPLEMENTED_BY` | Kayıt bildirimi → bildirilen implementation type. Runtime seçimini belirtmez. Factory/hesaplanan tipte hedef null ve unresolved. |
-| `USES_FACTORY` | Kayıt bildirimi → bağlı factory lambda/metodu. Delegate değişkeninin değeri çözülemiyorsa null. |
-| `INJECTS` | Public constructor/handler → parametre service type. Constructor ve `[FromServices]` tipi exact olabilir. Implicit HTTP adayı inferred; implementation seçimi yapılmaz. |
-| `HANDLED_BY` | Endpoint bildirimi → action/handler. Statik ilişki exact olabilir; endpoint activation her zaman `notProven`. |
-| `ACTIVATES` | Controller action → public constructor adayı. Her zaman inferred; custom activator veya constructor seçimi kanıtlanmaz. |
+| REGISTERS | Registration → declared service type; exact static argument, not executed registration |
+| IMPLEMENTED_BY | Registration → declared implementation; unresolved/null for factory or computed type |
+| USES_FACTORY | Registration → bound lambda/method; unresolved delegate-variable value stays null |
+| INJECTS | Public constructor/handler → service parameter type; exact for declared constructor/FromServices, inferred for implicit HTTP candidates |
+| HANDLED_BY | Endpoint declaration → action/handler; may be exact while activation remains notProven |
+| ACTIVATES | Controller action → public constructor candidate; always inferred |
 
-Mevcut `CALLS` compile-time hedefte kalır. Bir endpoint'in handler'ı içinden
-`IMessage.Read()` çağrısı interface slot'una gider; kayıtlı implementasyonların
-hepsine exact CALLS eklenmez. `REGISTERS` ve `IMPLEMENTED_BY` aynı kayıt düğümünde
-birleşir; service → tek seçilmiş implementation kenarı üretilmez.
+CALLS stays at its compile-time target: an IMessage.Read call is not expanded to
+registered implementations. REGISTERS and IMPLEMENTED_BY meet at the registration
+node; no single selected service→implementation edge is invented.
 
-Bütün ilişkiler kaynak aralığı, decoded kaynak SHA-256, analysis/context ID,
-gerekçe ve constructed `boundTarget` taşır. Compilation hatalı declaration'larda
-hedef bağlanmaz; aday yalnız related symbol olarak korunur. Tür düğümleri önceki
-identity sözleşmesi gereği generic definition'a normalize edilir; örneğin
-`IRepository<string>` occurrence'ın boundTarget alanında kalır.
+Evidence retains ranges, decoded-source SHA-256, analysis/context IDs, reasons,
+and constructed boundTarget. Erroneous declarations do not acquire exact targets;
+candidates remain related symbols. Generic type endpoints normalize to definitions;
+constructed uses such as IRepository<string> remain in occurrence signatures.
 
-## Microsoft DI destek matrisi
+## Microsoft DI matrix
 
-- Gerçek `ServiceCollectionServiceExtensions` sembolü ve assembly aidiyeti ile
-  `AddSingleton`, `AddScoped`, `AddTransient`; extension ve statik çağrı biçimleri.
-- Generic self/interface→implementation, `typeof` overload'ları, open generic
-  `typeof(IRepository<>) → typeof(Repository<>)` bildirimi.
-- Factory method/lambda, instance registration (yalnız açık `new` ifadesinin
-  concrete tipi bağlanır), multiple registration. Factory'nin generic dönüş
-  constraint'i concrete runtime implementation diye sunulmaz.
-- Normal/primary public constructor parametreleri DI eligibility olarak kaydedilir.
-  Bütün public constructor adayları kalır; optional/default parametre, overload
-  seçimi veya gerçekten DI tarafından instantiate edilme iddiası yoktur.
-- Kayıt başına ayrı `registration` entity: lifetime, form, conditional,
-  service/implementation type, openGeneric, limitations. Ayrı collection'lar veya
-  aynı service için kayıtlar birleştirilmez; collection alias/order analizi yoktur.
-- `if`, switch, döngü, conditional access ve kısa devre bağlamları conditional
-  olarak işaretlenir; expression evaluation veya reachability çalıştırılmaz.
-- Statik tipi `IServiceCollection` olan receiver/argümanlı destek dışı çağrılar
-  (scanning/wrapper/descriptor/mutation dahil) opaque REGISTERS/null üretir.
-  Bu bir **aday** bildirimi; her collection çağrısının kayıt yaptığı iddiası değildir.
-- Dynamic invocation, framework davranışını gizleyebileceği için tanı üretir;
-  bilinmeyen hedef/registration uydurulmaz. Factory return-flow, scanning expansion,
-  keyed registration, conditional outcome ve gerçek resolution desteklenmez.
+Supported recognition requires the real ServiceCollectionServiceExtensions symbol
+and metadata assembly, not an AddScoped-like name:
 
-## ASP.NET Core destek matrisi
+- AddSingleton/AddScoped/AddTransient in extension or static-call form; generic
+  self/interface→implementation, typeof overloads, and open-generic declarations.
+- Factory method/lambda and instance registrations. Only explicit new expressions
+  establish concrete instance type; factory constraints do not prove runtime type.
+- Separate registration entities for multiple declarations/collections, preserving
+  lifetime, form, conditional, service/implementation type, openGeneric, and limitations.
+  Collection alias/order analysis is not performed.
+- Normal/primary public constructor parameters as eligibility evidence, keeping
+  every constructor candidate. Optional parameters, overload selection, and actual
+  DI construction are not resolved.
+- if/switch/loops/conditional access/short-circuit contexts marked conditional,
+  without evaluating branches or reachability.
+- Unsupported calls receiving an IServiceCollection, including scanning, wrappers,
+  descriptors, and mutation, as opaque null-target REGISTERS candidates. This does
+  not claim every such call registers a service.
 
-Minimal API: gerçek `EndpointRouteBuilderExtensions.MapGet/MapPost/MapMethods`.
-`MapMethods` sabit inline array ve C# collection expression için method başına
-ayrı endpoint üretir. Sabit olmayan method collection/null/empty collection
-çözümlenmez. Lambda, method group, yerel/top-level handler desteklenir; delegate
-variable data flow çözümlenmez.
+Dynamic invocation produces a diagnostic without invented registration/targets.
+Factory return-flow, scanning expansion, keyed registration, conditional outcomes,
+and actual service resolution remain unsupported.
 
-`MapGroup` zinciri ve initializer'ı tek olan, yeniden atanmayan/ref kaçışı olmayan
-local alias'lar izlenir (en fazla 16 adım). Prefix ve route Roslyn constant value
-olmalıdır. WebApplication root'u tanınır. Keyfi IEndpointRouteBuilder parametresi,
-mutasyona uğramış group, route-group field/property/helper dönüşü veya runtime-computed prefix
-bilinmiyorsa route null olur. Prefix bildirimlerinin kaynakları endpoint Sources'a
-eklenir. Application/group convention'ları ve endpoint filter davranışı uygulanmaz.
+## ASP.NET Core matrix
 
-Controller: doğrudan bildirilen public, nonabstract, nongeneric controller class
-ve public instance nongeneric action'lar; MVC built-in Route, HttpGet/Post/Put/
-Delete/Patch/Head/Options, AcceptVerbs, ActionName ve Area. Controller/action
-prefix kombinasyonları, absolute `/` ve `~/`, `[controller]`, `[action]`, `[area]`
-token'ları; NonController/NonAction dışlaması. Action Async suffix'i varsayılan MVC
-convention'ıyla çıkarılır; özel convention/transformer çalıştırılmaz. Token expansion
-bildirim yorumudur, son host route'u değildir.
+Minimal APIs recognize EndpointRouteBuilderExtensions.MapGet, MapPost, and
+MapMethods. Constant inline arrays and C# collection expressions produce one
+endpoint per method; dynamic/null/empty method collections remain unresolved.
+Lambda, method-group, local, and top-level handlers are supported; delegate-variable
+data flow is not.
 
-Conventional routing için route uydurulmaz. Özel source/metadata base controller inheritance
-ve custom route attribute provider'ları açık tanı/unresolved route üretir;
-inherited action keşfi, base metadata route genişlemesi, application parts,
-custom convention ve tüm MVC selector combinasyonları tam destek iddiası yoktur.
-Explicit FromServices exact tip bağlantısı kurar; aynı compilation'daki statik
-kayıtla eşleşen implicit parametre inferred adaydır. Model binding precedence ve
-cross-project runtime service availability kanıtlanmaz.
+MapGroup chains and single-initializer local aliases are followed for up to 16
+steps if not reassigned or escaped by ref. Prefixes/routes must be Roslyn constants.
+WebApplication roots are recognized. Arbitrary IEndpointRouteBuilder parameters,
+mutated groups, fields/properties/helper returns, and computed prefixes leave the
+route null. Group evidence is included in endpoint Sources. Conventions and
+endpoint-filter behavior are not executed.
 
-## Endpoint kimliği ve belirsizlik
+Controllers cover directly declared public, nonabstract, nongeneric classes and
+public instance nongeneric actions with built-in Route, HttpGet/Post/Put/Delete/
+Patch/Head/Options, AcceptVerbs, ActionName, and Area. Controller/action prefixes,
+absolute `/` and `~/`, controller/action/area tokens, NonController/NonAction, and
+default Async-suffix removal are interpreted as declarations, not final host routes.
 
-`GraphIdentity.Canonical`/SHA-256 ile kimlik; project context (root-relative project,
-TFM/configuration), HTTP method, birleşik pattern, handler ve kaynak bildirim ayracı
-kullanılır. Bildirim ayracı relative file + syntax child ordinal yoludur; mutlak
-checkout yoluna veya satır numarasına bağlı değildir. Düzenlenen syntax yapısı kimliği
-değiştirebilir. Prefix bildirimi de ayraca dahildir.
+Conventional routes are not invented. Custom/source/metadata base-controller
+inheritance and custom route providers produce diagnostics/unresolved routes.
+Inherited action enumeration, application parts, custom conventions/transformers,
+and all MVC selector combinations are not fully supported. Explicit FromServices
+creates an exact type link; implicit parameters matching static registrations in
+the compilation remain inferred. Model-binding precedence and cross-project runtime
+availability are not proven.
 
-`collisionKey` yalnız context + method + route'dur; endpoint ID değildir. Aynı GET
-route'u iki yerde bildirilirse iki entity korunur ve duplicate limitation eklenir.
-Aynı path'teki POST ayrı kalır. Method kısıtı olmayan controller route'u `*` taşır.
-Route/method çözülemezse collisionKey null ve endpoint confidence unresolved olur;
-handler bağımsız biçimde exact bağlanabilir. Route değerinin null olması literal
-`<unknown-route>` isimli gerçek bir endpoint olduğu anlamına gelmez.
+## Endpoint identity and uncertainty
 
-Bu lexical duplicate kontrolüdür; route constraint, case, precedence veya farklı
-pattern'lerin runtime çakışma analizi değildir. Endpoint'in salt kaynak bildirimi,
-host'un onu aktive ettiğinin kanıtı değildir (`activation: notProven`).
+Canonical/SHA-256 identity includes project context, HTTP method, combined pattern,
+handler, and declaration discriminator (relative file + syntax-child ordinal path,
+including group declaration identity). It is independent of absolute checkout and
+line number; structural syntax edits can change it.
 
-Framework belirsizlik tanıları `framework:*` ile görünür ve coverage partial olur.
-Generator kapalı/eksik compilation gibi önceki coverage sebepleri de korunur.
-`completeWithinDeclaredScope` bile yalnız bu destek matrisi içinde anlamlıdır.
+`collisionKey` is context + method + route, not identity. Duplicate GET declarations
+remain separate entities with a duplicate limitation; POST remains distinct.
+Unconstrained controller routes use `*`. Unresolved method/route yields null
+collisionKey and unresolved endpoint confidence, while the handler may independently
+be exact. An unknown-route display label is not a real literal route.
 
-## CLI örnekleri ve gerçek framework referansı
+Duplicate detection is lexical, not runtime constraint/case/precedence analysis.
+Source declaration alone never proves activation (`activation: notProven`).
+Framework diagnostics use `framework:*` and mark coverage partial; prior generator
+or compilation limitations remain. Completeness is limited to this support matrix.
 
-Geliştirme build/restore solution üzerinden yapılır. `samples/Phase7/Frameworks.csproj`
-gerçek `Microsoft.AspNetCore.App` FrameworkReference ile ServiceCollection ve
-controller/Minimal API negatif fixture'ını derler. `samples/Phase7/MinimalWeb/MinimalWeb.csproj`
-gerçek Web SDK ile top-level minimal uygulamayı derler. Hiçbiri testlerde çalıştırılmaz.
-SDK 10.0.201'in seçtiği targeting pack **10.0.5** ile CLI doğrulanmıştır.
+## Real fixtures and CLI
+
+`samples/Phase7/Frameworks.csproj` uses Microsoft.AspNetCore.App FrameworkReference
+for library/negative fixtures. `MinimalWeb/MinimalWeb.csproj` uses the real Web SDK
+for top-level handlers. Tests compile/analyze them without running their hosts.
+The recorded SDK 10.0.201 targeting/runtime pack is **10.0.5**.
 
 ```sh
 uographs index samples/Phase7/Frameworks.csproj --trust-project --full --db .uographs/phase7-frameworks.db
@@ -135,39 +124,30 @@ uographs query dependencies 'GET /api/time' --depth 3 --db .uographs/phase7-web.
 uographs export --format json --db .uographs/phase7-web.db
 ```
 
-Repo içindeki gerçek `dotnet run --project ... --no-build --no-restore --` öneki ve
-ölçülen sonuçlar [STATUS](STATUS.md)'tadır. Controller constructor adayından geçen
-path için `--include-inferred` gerekir. Dependencies/path/impact varsayılan ilişki
-kümesi yeni altı framework ilişkisini de içerir; callers/callees hâlâ yalnız CALLS.
-SQLite mevcut entity JSON payload'ına optional `registration`/`httpEndpoint`
-metadata'sı eklenir; eski entity'lerde null alanlar yazılmaz. Eski snapshot'ı yeniden
-index etmek yeni ilişkileri üretir. Incremental replacement bütün framework entity,
-edge ve occurrence'larını da atomik değiştirir; kısmi framework bilgisi runtime
-container seçimi için cache değildir. Web SDK için Faz 6'nın fail-closed reuse
-sınırı korunur: dependency modeli unproven ise no-op/fresh iddiası yoktur.
+Paths through constructor candidates need include-inferred. Dependencies/path/impact
+include these six kinds; callers/callees default to CALLS. Optional registration/
+httpEndpoint metadata uses existing entity JSON payloads and is omitted when absent.
+Re-index old snapshots to obtain these records. Atomic replacement removes obsolete
+framework evidence too. The Web SDK remains outside the conservative base-SDK reuse
+model where dependencies are unproven; no fresh/no-op claim is inferred.
 
-Resmî semantik kaynakları:
-[.NET DI](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/overview),
+## Framework license evidence
+
+Phase 7 added no NuGet dependency; its historical inventory contained 50 packages.
+The current combined inventory is [DEPENDENCIES](DEPENDENCIES.md). FrameworkReference
+is limited to fixture/unit-test projects, not an ASP.NET runtime dependency in the
+product. UO.Graphs does not download or copy the installed framework into its package.
+
+Recorded upstream sources are [.NET DI](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/overview),
 [Minimal route handlers](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/route-handlers?view=aspnetcore-10.0),
-[Controller routing](https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/routing?view=aspnetcore-10.0).
-Ürün paket lisans seti [DEPENDENCIES](DEPENDENCIES.md)'tedir.
+[controller routing](https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/routing?view=aspnetcore-10.0),
+[ASP.NET Core 10.0.5 MIT](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.5/LICENSE.txt),
+and [runtime 10.0.5 MIT](https://raw.githubusercontent.com/dotnet/runtime/v10.0.5/LICENSE.TXT).
+The license texts were inspected on 2026-10-09. Preserve copyright/permission and
+upstream notices when distributing applicable components.
 
-## Geliştirme framework lisans kanıtı
-
-Yeni NuGet paketi yoktur; 50 kilitli paketin lisans envanteri değişmedi. İki yeni
-fixture'ın lock dosyası boş net10.0 paket kümesini sabitler. ASP.NET Core
-FrameworkReference yalnız fixture/unit test tarafındadır; ürün projelerine
-ASP.NET runtime bağımlılığı eklenmez. SDK 10.0.201 ve kurulu
-Microsoft.AspNetCore.App.Ref/Microsoft.AspNetCore.App **10.0.5** gerçek build ve
-index bağlamında doğrulandı. Framework kurulum bağımlılığıdır; ürün onu indirmez
-ve paketine kopyalamaz.
-
-Sürümün resmî [ASP.NET Core MIT metni](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.5/LICENSE.txt)
-ve [runtime MIT metni](https://raw.githubusercontent.com/dotnet/runtime/v10.0.5/LICENSE.TXT)
-2026-10-09'da okundu. Dağıtılan kopyalarda copyright ve izin metni korunmalıdır;
-framework'ün kendi third-party bildirimleri ürün MIT beyanıyla değiştirilmez.
-Kurulu `/usr/local/share/dotnet/LICENSE.txt` SHA-256:
+Recorded installed `/usr/local/share/dotnet/LICENSE.txt` SHA-256:
 `cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310`;
-aynı kökte `ThirdPartyNotices.txt` SHA-256:
+ThirdPartyNotices.txt:
 `2dc8f8c5a39401e928b5784ab564eb8b3ceb99ead3df8f260e0cab7e0bbecc7a`.
-
+These are dated local observations, not universal SDK-file hashes.

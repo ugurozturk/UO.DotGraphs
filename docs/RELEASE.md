@@ -1,109 +1,91 @@
-# Dağıtım ve release readiness
+# Distribution and release readiness
 
-Faz 11, mevcut UO.Graphs 0.9.0 kapsamını sağlamlaştırır. Yeni analiz alanı veya
-hosted servis eklemez. Paket **UO.Graphs.Cli**, komut **uographs**; JSON envelope 4,
-SQLite 3, context/export 1 korunur. Somut sonuçlar [STATUS](STATUS.md), ölçümler
-[PERFORMANCE](PERFORMANCE.md), güven sınırı [SECURITY](SECURITY.md) içindedir.
-Tam release kabulü, açık kalan platform/IPC/offline kapıları kapanana kadar verilmez.
+Package **UO.Graphs.Cli**, command **uographs**, version **0.9.0**. JSON envelope 4,
+SQLite 3, and context/export 1 are unchanged. Phase 11 hardened the existing scope;
+it added no new analysis domain or hosted service.
 
-İlk Faz 11 koşusunda kurulu tool'un workspace timeout'u çocuk proses seviyesinde incelendi:
-paket ve repo BuildHost'u `.NET 10.0.5` üzerinde başlayıp named pipe açarken
-`SocketException (13): Permission denied` ile durdu. İki BuildHost dizininin
-20 dosyası SHA-256 bakımından aynı. Bu ortamda eksik paket payload'ı kanıtlanmadı;
-sonraki GitHub/NuGet otomasyonu turunda izinli yerel macOS koşusunda Release
-paketinden kurulum ve yeni DB üzerinde index/query/context geçti. Bu iki farklı
-koşul birbirinin yerine geçmez; güncel komut ve sonuçlar STATUS'tadır.
-Ham stderr ve karşılaştırma `.uographs/phase11-followup/buildhost-probe-locale.json`
-içindedir. Genel bir timeout mesajı tek başına bu nedenin kanıtı değildir.
+As verified on **2026-10-10**, [Linux CI](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37995066871)
+passed build, **55 unit / 99 integration** tests, license checks, pack, and real
+installed-tool index/query/context. The
+[publishing run](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37997326843)
+exchanged an OIDC token and successfully pushed **0.9.0** to NuGet. Local macOS
+Release package smoke also passed. Publication does not close the remaining
+Windows, physical offline, performance/memory, or Copilot gates in [STATUS](STATUS.md).
 
-## GitHub Actions ve NuGet Trusted Publishing
+## GitHub Actions and NuGet Trusted Publishing
 
-Bu repository için iki workflow vardır:
+Two checked-in workflows implement delivery:
 
-- `ci.yml` / `build-test-pack`: `main` push, pull request veya elle çalıştırma.
-  Ubuntu 24.04 üzerinde global.json'daki SDK ile locked restore, Release build,
-  unit/integration testleri, lisans ve paket kapısı testleri çalışır. CLI paketi
-  `--no-build --no-restore` ile üretilir. Yeni tool-path ve ayrı NuGet cache'e
-  yalnız yerel feed'den kurulur; trust reddi ve **yeni DB üzerinde gerçek
-  index/query/context** zorunludur. Repo tarafından üretilmiş DB kullanılmaz.
-- `publish-nuget.yml`: yalnız `ugurozturk/UO.DotGraphs` içindeki başarılı
-  **main push** CI çalışmasını kabul eder. PR/fork/workflow_dispatch sonuçları
-  publish başlatmaz. Tamamlanan CI'ın run-id'sinden artifact indirilir; paket
-  kimliği/sürümü, kaynak commit'i ve SHA-256 manifest'i kontrol edilir. Restore,
-  build, pack veya artifact içinden script çalıştırma yapılmaz. `NuGet/login@v1`
-  ile kısa ömürlü anahtar alınıp aynı `.nupkg` gönderilir.
+- [build-test-pack](../.github/workflows/ci.yml): main push, pull request, or manual
+  invocation. Ubuntu 24.04 uses the pinned SDK, locked restore, Release build,
+  standard unit/integration tests, licenses, and package checks. It packs with
+  --no-build --no-restore, installs from a local feed into a new tool-path/cache,
+  then requires trust refusal and real index/query/context on a **new database**.
+- [publish-nuget](../.github/workflows/publish-nuget.yml): accepts only successful
+  first-party main-push CI from ugurozturk/UO.DotGraphs. PR/fork/manual CI does not
+  publish. It downloads the artifact from that exact run ID, verifies identity,
+  version, source commit, and SHA-256 manifest, then uses NuGet/login@v1 and pushes
+  the same nupkg. It does not restore/build/pack or execute artifact scripts.
 
-`packages-and-test-results` artifact'ı yalnız nupkg, paket manifest'i ve TRX
-sonuçlarını 14 gün saklar. Graph DB, `.uographs`, ham index/context çıktıları ve
-yerel kullanıcı dosyaları upload edilmez. Bu CI kendi checkout'undaki sentetik
-örnekleri analiz eder. Ürüne telemetry veya runtime upload eklenmez.
+The packages-and-test-results artifact retains nupkg, manifest, and TRX for 14 days.
+Graphs, .uographs, raw context/index evidence, and local user files are not uploaded.
+CI analyzes its own synthetic samples. This does not add runtime telemetry/upload.
 
-### Bir kez yapılacak NuGet ayarı
+### NuGet policy
 
-[NuGet.org Trusted Publishing](https://www.nuget.org/account/trustedpublishing)
-sayfasında `uozturk` hesabıyla aşağıdaki policy'yi oluşturun:
+The repository's successful publication demonstrates the configured OIDC path.
+When recreating or reviewing its [NuGet policy](https://www.nuget.org/account/trustedpublishing),
+use these workflow-aligned values:
 
-| Alan | Değer |
+| Field | Value |
 | --- | --- |
-| Policy owner | `uozturk` (paketin sahibi olacak hesap) |
+| Policy owner / workflow user | `uozturk` |
 | Repository owner | `ugurozturk` |
 | Repository | `UO.DotGraphs` |
-| Workflow file | `publish-nuget.yml` — yalnız dosya adı |
-| Environment | Boş; workflow GitHub Environment kullanmıyor |
+| Workflow file | `publish-nuget.yml` (filename only) |
+| Environment | Empty; the workflow has no GitHub Environment |
 | Package glob | `UO.Graphs.Cli` |
-| Scopes | Yeni paket oluşturma ve mevcut pakete yeni sürüm gönderme |
+| Scopes | Create packages and publish new versions |
 
-Workflow'daki `user: uozturk` NuGet profil adıdır, e-posta değildir. Kalıcı
-`NUGET_API_KEY` secret'ı oluşturmayın. `id-token: write` yalnız publish job'unda
-açıktır; CI'ın yayın yetkisi yoktur. GitHub Environment eklenirse policy ve
-workflow birlikte güncellenmelidir. İlk paket adı başka hesaba aitse bu policy
-o hesaba ait paketi yayımlama yetkisi vermez.
+The workflow user is a NuGet profile name, not an email address. No long-lived
+NUGET_API_KEY secret is required. Only the publish job has id-token: write; CI has
+no publishing permission. Adding a GitHub Environment requires coordinated policy
+and workflow changes. Policy ownership does not grant rights to another account's
+package. See [NuGet's official setup](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing).
 
-Resmi kaynaklar: [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing),
-[NuGet/login](https://github.com/NuGet/login),
-[GitHub workflow_run](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+### Releasing another version
 
-### Yeni sürüm çıkarma
+1. Keep both workflows on main and their branch filters consistent.
+2. Manually update `<Version>` in Directory.Build.props, review, and push/merge
+   to main. That push triggers publication after successful CI; no tag/GitHub
+   Release is required by these workflows.
+3. Inspect build-test-pack, then publish-nuget. A failed gate stops publication;
+   tests/assertions are not bypassed.
+4. After NuGet lists the version, use the README install/update commands.
 
-1. Policy'yi oluşturun; bu iki workflow'un varsayılan `main` branch'inde bulunmasını
-   sağlayın. Branch adını değiştirirseniz her iki workflow filtresini de değiştirin.
-2. Yeni sürüm için `Directory.Build.props` içindeki `<Version>` değerini elle
-   güncelleyin; değişiklikleri inceleyip `main` branch'ine push/merge edin. Bu, otomatik NuGet
-   yayını için tetiktir; ayrıca tag veya GitHub Release oluşturmak gerekmez.
-3. GitHub Actions'ta önce `build-test-pack`, sonra `publish-nuget` sonucunu izleyin.
-   Bir doğrulama başarısızsa paket yayımlanmaz; assertion/test atlanmaz.
-4. NuGet'te sürüm listelendikten sonra README'deki install/update komutunu kullanın.
+Version is the exact stable major.minor.patch value in Directory.Build.props,
+without CI run-number suffixes. The publish job reads the triggering commit's
+props. Existing NuGet versions are skipped via --skip-duplicate, never overwritten;
+a main push without a version change does not create another version.
 
-Policy eksikliği nedeniyle yalnız yayın işi başarısız olduysa, policy'yi düzelttikten
-sonra aynı `publish-nuget` çalışmasını yeniden çalıştırın. Artifact'ın 14 günlük
-saklama süresi dolmuşsa yeni bir main push/CI çalışması gerekir. Elle yeni CI
-başlatmak publish tetiklemez.
+If only publication failed because of policy, fix the policy and rerun that publish
+run while its artifact remains available. Once the 14-day artifact retention expires,
+a new main-push CI run is needed; manual CI does not publish.
+References: [NuGet/login](https://github.com/NuGet/login),
+[workflow_run](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
 
-Sürümün tek kaynağı `Directory.Build.props` içindeki `<Version>` değeridir.
-Örneğin `<Version>0.9.0</Version>` bütün CI çalıştırmalarında **0.9.0** üretir;
-çalıştırma numarası sürüme eklenmez. Mevcut doğrulama kararlı `major.minor.patch`
-biçimini ister. Yeni sürüm için değeri elle değiştirin; CI ve varsayılan yerel
-`dotnet pack` aynı tanımlı sürümü kullanır. Yayın işi de CI'ı tetikleyen commit'in
-props dosyasını okur. NuGet'te mevcut sürüm `--skip-duplicate` ile atlanır,
-üzerine yazılmaz; sürüm değiştirilmeden yapılan main push yeni paket sürümü oluşturmaz.
+## Prerequisites and offline preparation
 
-Workflow hazırlığı, canlı GitHub/OIDC/publish doğrulaması değildir. Bu akışın son
-yerel kontrolleri ve yapılmamış canlı adımlar [STATUS](STATUS.md)'ta belirtilir.
-Ubuntu workflow'u Windows/macOS runtime kabulünün yerine geçmez.
+Development SDK is pinned to **10.0.201**. The tool needs a .NET 10 runtime;
+indexing also needs the target global.json-selected installed SDK, reference packs,
+and restored project.assets.json. Recorded local runtime is **10.0.5**. Doctor
+reports installed tooling without evaluating the target. Other SDKs may disable
+fingerprint reuse; acceptance is limited to recorded configurations.
 
-## Gereksinimler ve offline hazırlık
-
-Geliştirme SDK'sı global.json ile **10.0.201**'e sabittir. Tool net10.0 runtime
-ister; index ayrıca hedef global.json'ın seçtiği kurulu SDK, reference pack ve
-önceden restore edilmiş project.assets.json ister. Bu ortam runtime **10.0.5**.
-Doctor hedef projeyi değerlendirmez; kurulu runtime/SDK hakkında bilgi verir.
-Başka SDK seçimi fingerprint reuse kapatabilir; destek iddiası STATUS ile sınırlıdır.
-
-Gerekli SDK/runtime/reference pack'leri ve kilitli NuGet paketlerini kurumca izinli
-bağlantılı hazırlık ortamında edinin; OS/architecture/RID ve hedef framework'leri
-eşleştirin. Cache ve kurum içi feed'i offline makineye kuruluş yöntemiyle taşıyın.
-NuGet.Config'de `<clear/>` ve yalnız onaylı yerel feed kullanın. Assets dosyaları
-mutlak package root taşıyabildiğinden son konumda açık restore gerekir:
+Acquire matching OS/architecture/RID SDK/runtime/reference packs and locked packages
+in an approved preparation environment. Transfer caches or internal feeds by the
+organization's process. Use NuGet.Config with clear and approved local feeds only.
+Assets can contain absolute package roots, so restore explicitly at the final location:
 
 ```sh
 dotnet restore UO.Graphs.slnx --locked-mode --configfile /approved/offline/NuGet.Config -m:1 -nr:false -p:NuGetAudit=false
@@ -111,45 +93,47 @@ dotnet restore samples/Phase2/Fixtures.slnx --locked-mode --configfile /approved
 dotnet restore samples/Phase3/Semantics.csproj --locked-mode --configfile /approved/offline/NuGet.Config -m:1 -nr:false -p:NuGetAudit=false
 ```
 
-Audit=false burada kapalı ağdaki açık bağımlılık hazırlığının parçasıdır; lisans
-ve güvenlik değerlendirmesinin yerine geçmez. Runtime index restore/download/update
-başlatmaz. Eksik SDK/assets exit 4 verir. Hedef MSBuild/custom task/generator kendi
-I/O'sunu yapabilir; ağın gerçekten kesildiği ayrıca altyapı ile doğrulanmalıdır.
-Bu tur fiziksel ağ izolasyonu altında smoke **NOT RUN**. Ağ kısıtlı terminal,
-`--ignore-failed-sources` veya boş feed tek başına ağ izolasyonu kanıtı değildir.
+Disabling audit here is explicit disconnected dependency preparation, not license
+or security verification. Runtime never initiates acquisition. Missing SDK/assets
+return exit 4. Trusted custom build/generator code can perform I/O; real network
+isolation needs infrastructure. Physical offline smoke remains **NOT RUN**.
+A restricted terminal, empty feed, or ignore-failed-sources alone is not proof.
 
-## Paket üretme ve kurma
+## Build and install a local package
+
+After explicit preparation and relevant tests:
 
 ```sh
-dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
-dotnet pack src/UO.Graphs.Cli -c Debug --no-restore -m:1 -nr:false -p:UseSharedCompilation=false -o /controlled/local-feed
-# NuGet.Config yalnız yukarıdaki feed'i içersin; hedef tool-path yeni/boş olsun.
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -m:1 -nr:false -o /controlled/local-feed
+# Configure only that local feed; use a new/empty tool-path.
 dotnet tool install UO.Graphs.Cli --version 0.9.0 --tool-path /controlled/new-tool-path --configfile /controlled/NuGet.Config --no-cache
 /controlled/new-tool-path/uographs --help
 ```
 
-Aynı DotnetTool paketi local manifest (`dotnet new tool-manifest`, `dotnet tool
-install --local ...`) veya global `dotnet tool install --global ...` kurulumuna
-uygundur. İzole geçici **tool-path** ve ayrı geçici **local manifest** kurulumları
-yerel nupkg'den geçti. Local manifest denemesinde `DOTNET_CLI_HOME`, NuGet cache ve
-manifest geçici kökteydi; help/query/context başarılıydı. Read smoke repo tarafından
-üretilmiş DB'yi kullandı; bu kurulum için index **NOT RUN** (aynı BuildHost IPC
-sınırı). Kullanıcının global kurulumu/manifesti değiştirilmedi. Global scope kurulumu
-**NOT RUN**. Raw komutlar: `.uographs/phase11-followup/local-manifest/commands.json`.
-İlk Faz 11 tesliminde Debug paketlendi; sonraki GitHub/NuGet otomasyonu turunda
-Release build/pack ve kurulu tool smoke da çalıştırıldı (ayrıntılar STATUS'ta).
-SDK'nin ürettiği tool ayarında command name `uographs` ve entry point `uographs.dll`.
-BuildHost-netcore, runtime native SQLite varlıkları ve bağımlı ürün DLL'leri pakette.
+The same DotnetTool package supports tool-path, local manifest, and global install.
+Isolated local-feed tool-path and temporary local-manifest installs were executed;
+the user's global installation/manifest was not changed. Local-manifest historical
+smoke checked help/query/context against a preexisting DB; its index was NOT RUN.
+Later Release tool-path smoke indexed a fresh DB successfully. Global-scope install
+remains NOT RUN. See STATUS for exact environments and results.
 
-MIT [LICENSE](../LICENSE), [THIRD-PARTY-NOTICES](../THIRD-PARTY-NOTICES.txt) ve
-`docs/licenses/` metinleri nupkg'ye eklenir. Ürün bağımlılığı eklenmedi. ABP LGPL
-paketleri yalnız izole test fixture'ıdır, tool paketine taşınmaz. 143 kilitli
-paket/sürüm envanteri [DEPENDENCIES](DEPENDENCIES.md)'tedir. Lisans denetimi paket
-zafiyet denetimi veya her native RID'de çalıştırma kanıtı değildir.
+The entry point is uographs.dll and command name uographs. BuildHost-netcore,
+native SQLite assets, and product DLLs are included, with [LICENSE](../LICENSE),
+[third-party notices](../THIRD-PARTY-NOTICES.txt), and docs/licenses texts. ABP LGPL
+fixture binaries are excluded. The 143-package/version [inventory](DEPENDENCIES.md)
+includes development fixtures too; audit success is not a vulnerability scan or
+execution on every native RID.
 
-## Kısa kullanım akışı
+Initial restricted macOS package indexing timed out because both package and repo
+BuildHost failed named-pipe bind with SocketException (13). Their 20 files matched
+by SHA-256. Later permitted macOS Release and Linux installed-tool flows passed;
+these observations are separate, not a claim that all IPC restrictions are resolved.
+The original probe is `.uographs/phase11-followup/buildhost-probe-locale.json`.
 
-Önce kurumca izinli ortamda hedefin SDK/assets hazırlığını tamamlayın. Ardından:
+## Typical workflow
+
+Prepare the target SDK/assets in an approved environment first:
 
 ```sh
 uographs doctor
@@ -161,33 +145,35 @@ uographs status --check-freshness --db /controlled/graph.db
 python3 scripts/safe_export.py /controlled/new-export.ndjson -- uographs export --format ndjson --db /controlled/graph.db
 ```
 
-`--trust-project` MSBuild yürütmesine izin verir, sandbox sağlamaz. Incremental
-değişiklikte seçili tüm proje kapsamını yeniden analiz edebilir. `partial`,
-`unresolved`, truncation ve `notChecked` kaybolmaz. Exact statik bağlanma runtime
-çalışma garantisi değildir. [CLI envelope JSON Schema](schemas/cli-envelope.schema.json)
-üst zarfı tanımlar; iç graph metadata'sı genişletilebilirdir. NDJSON/help/stderr
-bu tek-JSON schema'nın kapsamı dışındadır.
+Trust permits MSBuild execution, not sandboxing. Incremental changes can rebuild
+the whole selected closure. Preserve partial/unresolved/truncated/freshness states;
+static exact binding is not runtime execution. The
+[envelope schema](schemas/cli-envelope.schema.json) describes the outer JSON contract;
+inner graph metadata is extensible, and NDJSON/help/stderr are outside that schema.
 
-## Repo barındırmasından bağımsız doğrulama
+## Repository-host-independent verification
 
-Hazır SDK/assets ile `python3 scripts/verify_release.py --evidence /controlled/new-evidence`
-build, standart testler, lisans, pack, izole install ve index/query/context çalıştırır.
-Sonuçlar raw stdout/stderr ve komut listesi olarak yerelde tutulur; hata başarısız
-exit verir. Timeout sonrası kendi proses grubunu kapatır. Sonraki adımlar önceki
-hata nedeniyle çalıştırılmadıysa başarı sayılmaz. `--skip-tests` açık NOT RUN üretir.
+With prepared SDK/assets,
+`python3 scripts/verify_release.py --evidence /controlled/new-evidence` runs build,
+standard tests, audit, pack, isolated install, and index/query/context, retaining raw
+local output/commands. Failures return nonzero; skipped dependent steps are not passes.
+Timeout cleanup targets its own process group. --skip-tests explicitly reports NOT RUN.
 
-Network namespace'i kurumca hazırlanmış Linux agent'ta isteğe bağlı
-`--offline-prefix-json '["unshare","-n","--"]'` kurulu tool çağrılarını verilen
-launcher içinde yürütür. Bu script altyapı iznini yükseltmez ve launcher'ın gerçekten
-ağı engellediğini tek başına kanıtlamaz. macOS'ta bu launcher kullanılmadı.
-[On-prem Azure Pipelines örneği](../ci/azure-pipelines.onprem.yml) self-hosted pool
-ve yerel kanıt kullanır; hosted agent, secret, publish veya graph artifact upload yok.
-Azure DevOps/Windows/Linux çalıştırmaları **NOT RUN**.
+On an authorized Linux agent with a prepared namespace,
+`--offline-prefix-json '["unshare","-n","--"]'` runs installed-tool commands through
+that launcher. The script neither elevates permissions nor proves the launcher's
+network isolation by itself. This launcher was not used on macOS.
+The [on-prem Azure example](../ci/azure-pipelines.onprem.yml) uses a self-hosted pool
+and local evidence without hosted agents, secrets, publishing, or graph upload.
+Azure pipeline execution is NOT RUN; GitHub Linux CI is separately verified.
 
-## Açık release kapıları
+## Remaining release gates
 
-- 1000 proje, gerçek OS-cache-cold ölçüm ve child-process peak RSS: henüz doğrulanmadı.
-- Fiziksel disk dolumu, ağ izolasyonu ve bütün işletim sistemi/kurum agent matrisi açık.
-- Paket kurulum başarısı ile paketli index başarı durumu STATUS'ta ayrı gösterilir.
-- Copilot gerçek E2E önceki fazdan **NOT RUN**; dosya format testi onun yerine geçmez.
-- Publish/push/commit yapılmadı. Ürün için "production-ready" etiketi verilmez.
+- Windows execution and the wider organizational/self-hosted agent matrix.
+- Physical network isolation and physical disk exhaustion.
+- 1000-project analysis, 100-project leaf/dependent scenarios, true cache-cold runs,
+  and peak process-tree RSS.
+- Real Copilot E2E, beyond file-format and CLI subprocess checks.
+
+Package publication is verified, but full release acceptance remains incomplete.
+See [PERFORMANCE](PERFORMANCE.md), [SECURITY](SECURITY.md), and [STATUS](STATUS.md).

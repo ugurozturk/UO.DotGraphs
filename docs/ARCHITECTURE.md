@@ -1,181 +1,157 @@
-# Başlangıç mimarisi
+# Architecture
 
-## Projeler ve bağımlılık yönü
+## Projects and dependencies
 
-| Proje | Sorumluluk | Proje referansı |
+| Project | Responsibility | Project references |
 | --- | --- | --- |
-| `UO.Graphs.Core` | Graph kavramları, kanıt ve analiz durumu, ihtiyaç oldukça ortak sorgu sözleşmeleri | Yok |
-| `UO.Graphs.Roslyn` | Güven kontrollü workspace yükleme, sembol/ilişki çıkarımı ve analiz tanıları | Core |
-| `UO.Graphs.Storage.Sqlite` | Yerel şema, sürümleme, işlemler ve graph okuma/yazma | Core |
-| `UO.Graphs.Cli` | `uographs` komutları, giriş doğrulama, bileşim ve çıktı/exit code sözleşmesi | Core, Roslyn, Storage.Sqlite |
+| `UO.Graphs.Core` | Graph, identity, evidence, query/delivery contracts, source policy, fingerprints | None |
+| `UO.Graphs.Roslyn` | Trust-controlled preparation, workspace loading, symbol and relationship extraction | Core |
+| `UO.Graphs.Storage.Sqlite` | Versioned local storage, transactions, queries, bounded graph delivery | Core |
+| `UO.Graphs.Cli` | Input validation, composition, commands, output and exit codes | Core, Roslyn, Storage.Sqlite |
 
-Core, Roslyn ve SQLite paketlerinden bağımsız kalır. Analiz katmanı depolamayı doğrudan yönetmez; CLI akışı birleştirir. Test projeleri bu dört ürün projesine eklenebilir. Yeni katman, generic repository, uygulama içi mediator veya event bus başlangıç gereksinimi değildir. Dar arayüzler yalnızca gerçek kullanım ihtiyacı doğduğunda eklenir.
+Core has no Roslyn or SQLite package dependency. Roslyn does not manage storage;
+the CLI composes the indexing and publication flow. Test and fixture projects are
+separate from these four product projects. There is no generic repository, in-app
+mediator, event bus, remote service, or dynamic plugin loader.
 
-Akış: yerel giriş → güven/önkoşul kontrolü → Roslyn analizi → kanıtlı graph kaydı → SQLite → CLI sorgusu/export. İndekslenmiş graph sorgusu yeniden MSBuild yüklemeyi gerektirmez.
+```text
+Local C# project/solution
+  -> trust and prerequisite checks
+  -> MSBuild preparation + dependency fingerprint
+  -> Roslyn workspace + semantic/framework extraction (unless safe no-op)
+  -> source/input validation
+  -> atomic SQLite graph + fingerprint publication
+  -> read-only CLI query/context/export
+```
 
-## Saklanacak bilginin asgari anlamı
+## Current contracts
 
-Bu liste nihai tablo/API şeması değildir; ilgili fazda somutlaştırılacak doğruluk gereksinimleridir.
+Product **0.9.0**, query/index contract **4**, SQLite schema **3**, context/export
+format **1**, declaration identity **2**. These versions describe different
+contracts and must not be substituted for each other. Phase-specific older
+versions are historical records under `docs/history/`.
 
-- **Analiz kaydı:** Analiz kimliği, zaman, araç sürümü, solution/proje kapsamı, ilgili SDK/Roslyn sürümleri, configuration/target framework/preprocessor gibi sonucu etkileyen bağlam ve tanılar.
-- **Varlık:** Bağlamı içinde ayırt edilebilir kimlik, sembol türü, adı, proje/assembly aidiyeti ve kaynak konumları. Overload, partial tanım ve çoklu target framework tek bir yanıltıcı sembole indirgenmez.
-- **İlişki:** Kaynak, varsa hedef, ilişki türü, `exact`/`inferred`/`unresolved`, kaynak kanıtı ve analiz kaydı. Çözülemeyen aday, uydurma hedefe bağlanmaz.
-- **Kanıt:** Dosya, kaynak aralığı, ilişkinin gerekçesi/çıkarım kuralı ve kanıtın ait olduğu kaynak sürümünü belirleyebilen bilgi. Kaynak değiştiğinde eski kanıt güncel diye sunulmaz.
-- **Kapsam/durum:** Tamamlanan, kısmen analiz edilen, başarısız veya atlanan bölümler ve nedenleri. İlişkinin güven sınıfı ile analiz kapsamının tamamlığı ayrı boyutlardır.
+An analysis snapshot records its ID/time/tool version, logical root and input,
+SDK/Roslyn versions, project TFM/configuration/preprocessor/reference contexts,
+generated-code policy, diagnostics, coverage, and limitations. Entities preserve
+canonical IDs and all indexed declaration locations. Relationships retain kind,
+direction, context, confidence, and typed endpoints. Occurrences preserve
+source ranges/hashes, rules, bound signatures, and unresolved candidates.
 
-Schema version ile analiz kimliği ayrı tutulur. Yazma akışı transaction kullanır; başarısız/yetersiz analiz önceki geçerli graph'ı sessizce “tam ve güncel” bir boş sonuçla değiştirmez. Kısmi kayıt politikası uygulandığı fazda açıkça tanımlanır ve test edilir.
+Coverage, confidence, freshness, and query truncation are independent. `exact`
+proves the stated static meaning, never runtime execution. Unresolved targets
+remain null. External and excluded-source symbols remain endpoints without fake
+source entities. See [IDENTITY](IDENTITY.md) and [RELATIONSHIPS](RELATIONSHIPS.md).
 
-Sorgular kullanılan analiz kaydını ve kapsam sınırlamalarını görünür kılar. Kaynakların sonradan değişmesi veya incremental indexing eksikleri saklanmaz. İndekslenmiş snapshot hakkında bilinenler ile çalışma dizininin güncelliği hakkında doğrulananlar ayrılır.
+## Workspace and semantic analysis
 
-## Workspace güven sınırı
+`--trust-project` is checked before target evaluation. The target SDK and restored
+assets must already exist. MSBuildLocator registers before workspace APIs load;
+a process registration lock, `CanRegister`, `NoInlining` boundary, and Roslyn
+assembly-version checks protect initialization. Microsoft.Build runtime assets are
+not copied into the product.
 
-`--trust-project` denetimi, incelenen proje için MSBuild değerlendirmesi dahil yükleme başlamadan yapılır. Bayrak verilmezse tam analiz açıklayıcı hata ile durur. Hazırlık aşaması ayrıca bir güvenilmeyen-kod analiz modu taahhüt etmez.
+Configuration is global to the analysis; multi-target projects require a selected
+TFM. Reference compilation contexts are compared before source IDs are unified.
+The comparison includes assembly identity, parse and compilation options, source
+content, reference properties/aliases/EmbedInteropTypes, PE module MVIDs, and
+recursive compilation references. Mismatches remain explicit and partial.
 
-Gerekli SDK ve assets kullanıcı tarafından önceden hazırlanır. Analiz motoru restore/download/update başlatmaz. Hedef framework veya referans çözümleme sorunları analiz tanısı ve kısmi/başarısız durum olarak saklanır. Güven verilen projenin özel build mantığı için sandbox veya ağ izolasyonu iddiası yoktur.
+Generators require separate `--allow-generators` permission. Without it, analyzer
+references are removed before compilation and potential missing output is reported.
+Permitted generators run through Roslyn's driver with real parse options,
+additional files, and analyzer configuration. Diagnostic analyzers are not run.
+Generated declaration inclusion is a separate policy. See [WORKSPACE](WORKSPACE.md).
 
-## SDK, paketler ve lisans
+Calls and references use SemanticModel, symbol binding, and IOperation; there is
+no name/regex-based call matching. `CALLS` retains compile-time binding. Runtime
+delegate/dynamic/reflection targets remain unresolved. A usable partial analysis
+may be saved with explicit coverage; preparation/fatal failure preserves the old
+snapshot.
 
-2026-10-08 tarihinde bu çalışma ortamında `dotnet --list-sdks` ve `dotnet --info` ile **.NET SDK 10.0.201**, runtime **10.0.5**, RID **osx-arm64** gözlendi. Faz 1'de `global.json` SDK 10.0.201'e sabitlendi; `allowPrerelease: false` ve `rollForward: disable` kullanılıyor. Dört ürün projesi, iki test projesi ve iki örnek proje net10.0 hedefliyor.
+For homogeneous, diagnostic-free, same-TFM solutions with generators disabled,
+projects share one workspace and an immutable analyzer-free Solution. Mixed TFM,
+project-input, and generator paths remain separate. This optimization does not
+introduce method- or project-granular incremental reuse.
 
-Faz 1 paketleri merkezi olarak sabitlendi; sekiz lock dosyası ve [lisans envanteri](DEPENDENCIES.md) eklendi. Gerçek doğrulama sonuçları [STATUS](STATUS.md), JSON/CLI sözleşmesi [README](../README.md) içindedir. Paket eklenen her fazda:
+## Framework extraction
 
-1. Gerçek yayımlanmış kararlı sürüm ve .NET 10 uyumluluğu resmi paket/proje kaynaklarından doğrulanır.
-2. Doğrudan sürümler kesin yazılır; geçişli çözümleme lock dosyalarıyla sabitlenir ve locked restore geliştirme doğrulamasına alınır.
-3. Doğrudan ve geçişli bağımlılıklar, varsa taşınan native bileşenler dahil, gerçek lisans metni/ifadesi, sürüm, kaynak URL ve bildirim yükümlülükleriyle envantere alınır. Paket adı veya sağlayıcı adına bakarak lisans varsayılmaz.
-4. Permissive olmayan veya belirsiz lisans sessizce kabul edilmez; uygun alternatif aranır, kapsamı etkileyen çözümsüz karar kullanıcıya sunulur.
+Small internal `IFrameworkExtractor` implementations are statically registered
+inside Roslyn. `FrameworkExtractionContext` provides compilation/documents,
+identity resolution, source evidence, and graph construction, without host or
+storage access. Extractors bind real framework symbols and metadata assemblies.
+The analyzed application, DI container, broker, DbContext, and HTTP client are not
+started.
 
-Geliştirme restore/build adımları ile kurulmuş `uographs` komutunun offline çalışma doğrulaması ayrı raporlanır. Ürün MIT lisans metni Faz 1'de eklendi; üçüncü taraf lisansları ürünün MIT beyanıyla değiştirilmiş olmaz.
+| Extractor area | Preserved information | Contract |
+| --- | --- | --- |
+| Microsoft DI / ASP.NET Core | Registration declarations, service parameters, endpoint/handler and constructor candidates | [FRAMEWORKS](FRAMEWORKS.md) |
+| UO.Mediator / MediatR / MassTransit | Closed message identity, dispatch/publish, handler/consumer/behavior contracts and candidates | [MESSAGING](MESSAGING.md) |
+| ABP | Service/module/repository contracts and inferred exposure/DI candidates | [ABP-EF-REFIT](ABP-EF-REFIT.md) |
+| EF Core | Source model/mapping declarations, not an effective runtime model | [ABP-EF-REFIT](ABP-EF-REFIT.md) |
+| Refit | Client interface contracts, unresolved base address and remote endpoint | [ABP-EF-REFIT](ABP-EF-REFIT.md) |
 
-## Genişleme sınırı
+Optional framework metadata uses existing SQLite JSON payloads. New extraction
+rules do not change CALLS into runtime dispatch edges. Framework package fixtures
+are separate from product dependencies; the ABP LGPL closure is isolated in its
+non-packable analysis fixture.
 
-Semantik ve framework ilişkileri aynı kanıt/durum sözleşmesine uyar. DI, HTTP, mediator ve framework çıkarımları runtime eşleşmesini kanıtlayamıyorsa `inferred` veya `unresolved` kalır. İlgili fazlarda desteklenen kalıplar ve sınırlar açıkça listelenir.
+## Storage, queries, and delivery
 
-AI context/export CLI çıktısı üretir; uzak modele bağlantı kurmaz. Copilot skill bu CLI'ın tüketicisidir. Incremental indexing doğruluğu aynı snapshot'ın tam indeks sonucu ile karşılaştırılır; watcher gerektirmez. Paketleme stratejisi ve performans bütçeleri Faz 11'de ölçümle netleşir; NativeAOT zorunlu değildir.
+SQLite stores one committed snapshot. Schema 3 contains endpoint nodes, entities,
+relationships, occurrences, and optional fingerprint data, with foreign keys and
+adjacency/evidence indexes. A process-wide OS file lease is held from before
+analysis through commit. WAL and one transaction publish graph and manifest
+together. Errors/cancellation roll back; readers see one consistent generation.
 
-## Faz 2 gerçekleşen sözleşme
+Queries use one read-only transaction and parameterized, bounded SQL reads.
+Deterministic BFS tracks visited nodes, direction, work/depth/result limits, and
+occurrence truncation. Impact traverses incoming dependency edges only;
+REFERENCES and DECLARES are not propagation rules. See [QUERIES](QUERIES.md).
 
-Dört ürün projesi korunur; yeni katman veya servis yoktur. Sürüm 0.2.0 ve JSON v2,
-SQLite'ın mevcut atomik schema v1 tablolarını kullanır. Eski snapshot'ın identity v1
-bilgisi korunur; yeni index canonical v2 üretir. Hazırlık/fatal hata eski snapshot'ı
-korur, analiz edilebilir kısmi sonuç açık `partial` etiketiyle kaydedilebilir.
+Context/export use bounded selection in Storage and contracts/serialization in
+Core. Context enforces a whole-stdout Unicode-scalar budget by removing records,
+while retaining uncertainty and truncation. Opt-in snippets require a decoded
+source hash match and the source path policy. Export preserves original evidence,
+including JSON comments in Mermaid/DOT. See [CONTEXT-EXPORT](CONTEXT-EXPORT.md).
 
-[Kimlik v2](IDENTITY.md) root-relative project + TFM/configuration + Roslyn declaration
-key kullanır. [Workspace sözleşmesi](WORKSPACE.md) SDK/Locator başlatma sırasını,
-TFM/configuration seçim ve referans bağlamlarını, generator iznini ve generated
-politikayı tanımlar. Generated kod disk taramasıyla toplanmaz; generator çıktıları
-izinle ve bellekte üretilir. Bu paragraf Faz 2 tabanını kaydeder; Faz 3 ekleri aşağıdadır.
+Status supports old schemas 1/2; current query/delivery commands require explicit
+re-indexing. Successful indexing replaces the old schema atomically. Read commands
+never migrate or repair a database. Unknown nonempty schemas are rejected.
 
-Ürün paket seti aynı kaldı; test fixture bağımlılıkları dahil 50 kilitli paketin
-lisans kanıtı DEPENDENCIES'te güncellendi. Güncel kabul ve platform sınırları STATUS'tadır.
+## Incremental indexing and freshness
 
-## Faz 3 gerçekleşen sözleşme
+`IncrementalIndexer` performs trust-gated preparation/preprocessing and SHA-256
+inventory/content checks. Only an unchanged, complete dependency model allows a
+no-op without workspace loading or replacement. All other cases rebuild the
+entire selected project closure. Custom build/generator dependencies outside the
+validated model disable reuse.
 
-Core merkezi ilişki yönlerini, typed endpoint'leri ve tekil relationship/occurrence
-ayrımını taşır. Roslyn `SemanticModel`, symbol binding ve IOperation üzerinden
-çıkarır; ad/metin benzerliğiyle CALLS eşleştirmesi yoktur. Kaynak referans compilation'ı
-seçilen indeks bağlamıyla uyuşmadığında semboller birleştirilmez. External semboller
-source entity taklidi yapmadan endpoint olarak saklanır.
+Each read uses its own snapshot's manifest. Optional freshness checks read the
+filesystem/environment without MSBuild, restore, or subprocesses. Default is
+`notChecked`; required freshness rejects stale/unknown with exit 9. See
+[INCREMENTAL](INCREMENTAL.md).
 
-Sürüm 0.3.0, JSON v3, SQLite schema v2. Eski v1 kayıtlar okunur; yeniden index
-ilişkiler ve occurrence'larla birlikte atomik replacement yapar. CLI find çıktısına
-kanıt eklendi; Faz 3 kapsamında traversal yapılmadı. Faz 4 ekleri aşağıdadır. Runtime dispatch expansion yoktur.
-Yönler, destek matrisi ve eksikler [RELATIONSHIPS](RELATIONSHIPS.md) içindedir.
-Paket sürümleri ve ürün bağımlılık seti değişmedi.
+## SDK, dependencies, distribution, and trust
 
-## Faz 4 gerçekleşen sözleşme
+`global.json` pins **10.0.201**, `allowPrerelease: false`, `rollForward: disable`.
+Central exact package versions and lock files pin dependency resolution. The
+[license inventory](DEPENDENCIES.md) includes development fixtures and bundled
+native/BuildHost components; it is not a list of tool runtime dependencies alone.
+Every dependency change requires stable-version, compatibility, and license
+verification. Non-permissive or unknown licenses are not silently accepted.
 
-Core `GraphQuery.cs` sorgu/options/envelope/evidence-path sözleşmesini taşır.
-Storage `GraphQueries.cs` read-only tek transaction içinde parametreli, indeksli
-komşuluk/kanıt okumalarıyla bounded BFS uygular; CLI graph'ı belleğe toplamaz.
-Cycle/diamond visited kümesi, deterministik komşuluk sırası ve açık depth/result/
-edge/evidence bütçeleri kullanılır. Impact yalnızca seçili bağımlılık ilişkilerini
-ters yürür; REFERENCES/DECLARES yayılımı yoktur.
+The `UO.Graphs.Cli` .NET tool packages the four product projects, required payloads,
+licenses, documentation, and distribution helpers. GitHub CI tests and packs one
+artifact; a separate publishing workflow verifies that artifact before OIDC-based
+NuGet publication. No runtime upload is added. [RELEASE](RELEASE.md) describes
+installation and platform evidence; [PERFORMANCE](PERFORMANCE.md) records measured
+costs rather than assumed budgets.
 
-Ürün 0.4.0, JSON v4, SQLite schema v3. Endpoint node FK'leri ve yön/kanıt indeksleri
-atomik replacement'ta oluşturulur. Eski v1/v2 için status okuması sürer; yeni query
-komutları açık yeniden index ister ve migration yapmaz. Yeni paket veya katman yok.
-[QUERIES](QUERIES.md) versiyonlu envelope ve yön/limit/path/impact sözleşmesidir.
+The Copilot skill and its byte-matched standalone template are terminal consumers.
+The installer refuses existing/symlinked destinations and changes no permissions.
+They do not introduce a product dependency on Copilot. See [COPILOT-SKILL](COPILOT-SKILL.md).
 
-## Faz 5 gerçekleşen sözleşme
-
-Core `GraphDelivery.cs`, `DeliveryWriter.cs`, `SourceSnippets.cs` sınırları,
-context/export format v1'i, tüm stdout bütçesini ve opt-in kaynak politikasını
-barındırır. Storage `GraphDelivery.cs` tek read-only transaction içinde exact
-çözüm, sınırlı lexical aday ve öncelikli BFS/altgraph toplama yapar. CLI iki yeni
-komutu birleştirir; yeni katman/paket yoktur. JSON query v4 ve SQLite v3 korunur.
-
-Context'te kaynak varsayılan kapalıdır; snippet hash'i decoded kaynak metninden
-hesaplanır, uyumsuz kaynak metni gösterilmez. Bu kontrol incremental indexing veya
-graph'ın genel freshness kanıtı değildir. Mermaid/DOT yorumları da orijinal kanıt ve
-analiz metadata'sını korur. Sınırlar ve format sözleşmesi [CONTEXT-EXPORT](CONTEXT-EXPORT.md),
-gerçek kabul ve ölçümler [STATUS](STATUS.md)'tadır.
-
-
-## Faz 6 gerçekleşen sözleşme
-
-Core `IndexFingerprint` içerik inventory, eksikler ve freshness kontrolünü taşır.
-Roslyn `IncrementalIndexer` trust sonrası evaluation/preprocess + SHA-256 doğrular;
-kapalı dependency modeli eşitse workspace/compilation açmadan no-op verir. Aksi
-halde bütün seçili project closure yeniden analiz edilir. MSBuild'in item tarih
-metadata'sı fingerprint dışında kalır. Custom build/generator girdileri kanıtlanamazsa
-reuse kapatılır; method-level incremental iddiası yoktur.
-
-Storage'ın OS writer lease'i analizden commit'e kadar tutulur; WAL transaction'ı
-graph ile isteğe bağlı fingerprint tablosunu atomik yayınlar. Her query kendi read
-transaction'ındaki manifesti kullanır. Freshness kontrolü pure filesystem/content
-okumasıdır; varsayılan notChecked, require-fresh stale/unknown durumunda exit 9.
-Ürün 0.6.0; JSON v4, SQLite schema 3 ve delivery v1'e uyumlu ek alanlar. Yeni paket,
-katman veya framework inference analyzer'ı yoktur. Ayrıntılar [INCREMENTAL](INCREMENTAL.md).
-
-
-## Faz 7 gerçekleşen sözleşme
-
-Roslyn içindeki küçük `IFrameworkExtractor` ve ortak kanıt context'i, statik kayıtlı
-Microsoft DI ve ASP.NET Core modüllerini çalıştırır. Yeni katman/paket veya plugin
-loader yoktur. Core'a optional registration/HTTP metadata'sı ve altı yönlü ilişki
-sözleşmesi eklendi; existing SQLite JSON payload ve atomik replacement kullanılır.
-Ürün 0.7.0, JSON v4 / SQLite 3 / delivery 1 korunur. Source compilation ve framework
-sembol aidiyeti kanıttır; uygulama/container/host çalıştırılmaz. Ayrıntılı kapsam,
-kimlik ve exact/inferred/unresolved ayrımı [FRAMEWORKS](FRAMEWORKS.md)'tedir.
-
-
-## Faz 8 gerçekleşen sözleşme
-
-Mevcut Roslyn framework extractor hattına `MessagingExtractor` eklendi. Gerçek UO.Mediator.Shared
-2.4.2, MediatR 12.4.1 ve MassTransit.Abstractions 8.3.6 sözleşmeleri kullanılır. Core'daki
-optional Message metadata'sı ve yedi yeni ilişki; SQLite'ın mevcut atomik JSON payload'ı,
-query/path/impact ve context/export ile taşınır. Closed mesaj tipleri assembly/declaration/
-context/type arguments ile ayrılır. Runtime aday kümesi unresolved, statik sözleşme
-uyumlu adaylar inferred kalır; CALLS compile-time anlamını korur.
-Ürün 0.8.0; JSON v4 / SQLite 3 / delivery 1. Ürün bağımlılığı değişmedi; gerçek paket
-fixture'ları ile kaynak contract fixture'ları ayrı test edilir. Kapsam: [MESSAGING](MESSAGING.md).
-
-
-## Faz 9 gerçekleşen sözleşme
-
-Mevcut extractor hattına ayrı AbpExtractor, EfCoreExtractor, RefitExtractor eklendi.
-Yeni katman veya ürün dependency'si yok. Core Framework/ModelMapping/HttpContract
-metadata ve dokuz ilişki yönü mevcut SQLite JSON payload/query/export hattında korunur.
-ABP inferred candidate, EF source mapping ve Refit client contract birbirinden ayrıdır;
-runtime exposure/model/remote-target bilinmezliği partial kalır. Ürün 0.9.0;
-JSON v4 / SQLite 3 / delivery 1. Ayrı kapsam/test matrisi [ABP-EF-REFIT](ABP-EF-REFIT.md).
-
-## Faz 10 — terminal skill tüketicisi
-
-`.github/skills/uographs/SKILL.md` ve göreli CLI başvurusu mevcut CLI'ı tüketir;
-Core/Roslyn/Storage/Cli katmanlarına Copilot bağımlılığı eklemez. Aynı iki dosyanın
-dağıtım template'i ve stdlib kurulum aracı repo dışında kullanılabilir. Kurulum
-mevcut skill'i birleştirmez/overwrite etmez, VS Code veya terminal izin ayarlarını
-değiştirmez. Sorgu ve güncelleme ayrı yetkilendirilir; incremental tüm seçili
-kapsamı analiz edebilir. [Format, veri sınırı ve kabul](COPILOT-SKILL.md).
-
-## Faz 11 — sağlamlaştırma
-
-Homojen TFM solution, generator kapalı olduğunda bir workspace ve immutable
-analyzer-free Solution paylaşır. Farklı inner-build/generator yolları ayrı kalır;
-referans bağlamı eşitliği aliases/EmbedInteropTypes, PE module MVID ve recursive
-compilation referanslarını da kontrol eder. Method/project granular incremental
-eklenmez; değişiklik bütün seçili closure’ı invalid eder. MSBuild stream’leri
-sınırlı ve timeout/cancellation pipe drain’i kapsar. Native SQLite transactional
-publication ve OS writer lease korunur. Tool paketi aynı dört katmanı dağıtır.
-[Ölçüm](PERFORMANCE.md), [güven sınırı](SECURITY.md), [yerel dağıtım](RELEASE.md).
+Trust does not isolate custom tasks or generators. Preparation subprocess output
+and cancellation bounds do not automatically constrain Roslyn BuildHost or
+in-process generators. The exact boundaries are in [SECURITY](SECURITY.md).

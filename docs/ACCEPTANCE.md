@@ -1,89 +1,125 @@
-# Faz bazlı kabul kriterleri
+# Phase acceptance criteria
 
-Bu belge doğrulanacak tabanı tanımlar; uygulama fazlarının ayrıntıları kullanıcının ilgili faz talimatıyla netleşir. Burada yer alması bir özelliğin tamamlandığı veya sonraki fazın başladığı anlamına gelmez.
+This document defines verification requirements. Listing a feature here does not
+mean it is implemented or accepted, nor does it authorize a later phase.
+[STATUS](STATUS.md) contains actual results; `history/` contains dated phase records.
 
-## Ortak kapı
+## Common gate
 
-Faz 0 dışında her fazda gerçek build, ilgili otomatik testler ve gerçek CLI smoke test çalıştırılır. Komut, exit code, ortam ve sonuç STATUS'a yazılır. Çalıştırılamayan kontrol gerekçesiyle `NOT RUN` kalır; başarısızlık ve eksiklik gizlenmez. Statik inceleme veya derleme tek başına uçtan uca kabul değildir.
+Every implementation phase after Phase 0 requires a real build, relevant automated
+tests, and real CLI smoke. Record command, exit code, environment, and result.
+Unexecuted checks remain `NOT RUN` with a reason. Source inspection or compilation
+alone is not end-to-end acceptance.
 
-Testler gerçek analiz/depolama/sorgu akışının beklenen davranışını sınar; hardcoded fixture çıktısı üretim implementasyonu yerine kullanılamaz. Negatif ve kısmi analiz senaryoları ilgili faza dahildir. Fixture'lar yerel ve kontrollü olabilir; test başarısı tüm gerçek solution'larda başarı iddiası değildir.
+Tests exercise actual analysis/storage/query behavior, including negative and
+partial-analysis cases. Hardcoded fixture output is not an implementation.
+Controlled fixture success does not imply support for every real solution.
 
-SDK/paket eklenen veya değişen fazda kararlı sürüm, uyumluluk, kesin sürüm/lock ve lisans kanıtı kontrol edilir. Restore geliştirme adımı olarak açıkça ayrılır. Runtime restore/download/update çağırmama davranışı doğrulanır; gerçek offline kabul yapılmadıysa ayrıca `NOT RUN` yazılır. `--trust-project` olmadan hedef proje MSBuild ile yüklenemez.
+When SDKs/packages change, verify stable versions, compatibility, exact pins/locks,
+and licenses. Separate development restore from runtime. Verify no automatic
+runtime restore/download/update and refusal before target MSBuild evaluation when
+`--trust-project` is absent. Real offline acceptance is a separate gate.
 
-Windows/Linux/macOS sonuçları ayrı tutulur. Bir platformdaki build/test diğer platformların testi yerine geçmez. Doğrulanmamış zorunlu kriteri kalan faz tamamlandı işaretlenmez; son platform matrisi Faz 11 kapısında değerlendirilir.
+Track Windows, Linux, and macOS separately. A passing platform does not validate
+another. Do not close a phase while mandatory criteria remain unverified; Phase 11
+includes the final platform matrix.
 
-## Faz 0 — Hazırlık
+## Phase 0 — Preparation
 
-- Mevcut klasör, kullanıcı dosyaları, Git durumu ve kurulu SDK incelenir; dosyalar korunur.
-- AGENTS ve dört ürün/teknik/durum belgesi oluşturulur; sınırlar, sıralama ve doğruluk sözleşmesi tutarlıdır.
-- Mevcut olmayan uygulama/test sonucu iddia edilmez; bir sonraki faz açıkça kaydedilir. Build/test/CLI smoke zorunlu değildir.
+- Inspect the directory, user files, Git state, and installed SDK; preserve files.
+- Establish AGENTS, product, architecture, acceptance, and status documents with
+  consistent scope, sequencing, and accuracy rules.
+- Do not invent implementation/test results. Build/test/smoke are not required.
 
-## Faz 1 — Çalışan uçtan uca iskelet
+## Phase 1 — Working end-to-end skeleton
 
-- Dört ürün projesi .NET 10 ile derlenir; SDK ve gerçek, kararlı bağımlılık sürümleri sabittir. MIT metni ve bağımlılık lisans kanıtları bulunur.
-- `uographs` çalışır. Küçük gerçek C# fixture'ından Roslyn ile çıkarılan asgari bir varlık, güven onaylı akışta SQLite'a yazılır ve ayrı CLI çağrısıyla geri okunur.
-- Help ve hatalı girdi davranışı, SQLite kalıcılığı, güven bayrağı yokluğu ve eksik önkoşul hatası test edilir. Komut isimleri/çıktı/exit code sözleşmesi bu fazda belgelenir.
-- Geniş sembol/ilişki desteği tamamlanmış gibi sunulmaz.
+- Build four .NET 10 product projects with pinned stable SDK/packages, MIT text,
+  and dependency license evidence.
+- Extract a real entity from a small C# fixture through trust-gated Roslyn loading,
+  persist it in SQLite, and read it through a separate CLI process.
+- Test help, invalid input, persistence, missing trust/prerequisites; document
+  commands, output, and exits without claiming broad symbol/relationship coverage.
 
-## Faz 2 — Workspace ve semboller
+## Phase 2 — Workspace and symbols
 
-- Gerçek çok projeli solution yüklenir; desteklenen sembol türleri ve kapsam belgelenir, bulunup sorgulanır.
-- Overload, partial tanım, projeler arası kimlik ve birden çok target framework/configuration bağlamı karıştırılmaz; seçilen/atlanmış bağlam görünürdür.
-- Eksik SDK/assets, çözülemeyen referans ve yüklenemeyen proje testleri açık tanı/kısmi-başarısız durum üretir. Boş sonuç tam analiz gibi sunulmaz.
+- Load real multi-project solutions and document/query supported symbol kinds.
+- Keep overloads, partial declarations, project identity, TFM, and configuration
+  contexts distinct; show selected and skipped contexts.
+- Missing SDK/assets, references, and projects produce diagnostics and partial or
+  failed analysis. Empty output must not masquerade as complete analysis.
 
-## Faz 3 — Semantik ilişkiler
+## Phase 3 — Semantic relationships
 
-- Çağrı, tip bağımlılığı, kalıtım ve implementasyon için desteklenen statik kalıplar kaynak kanıtıyla kaydedilir.
-- Overload çözümü, interface/virtual çağrı ve dinamik/çözülemeyen aday testleri `exact`/`inferred`/`unresolved` ayrımını doğrular. Statik hedef runtime dispatch garantisi olarak sunulmaz.
-- Kaynak aralığı, analiz bağlamı ve çıkarım gerekçesi depolama ve CLI çıktısında korunur.
+- Record supported calls, type dependencies, inheritance, and implementation with
+  source evidence.
+- Test overload resolution, interface/virtual calls, dynamic/unresolved candidates,
+  and exact/inferred/unresolved distinctions. Static targets are not runtime proof.
+- Preserve ranges, analysis context, and reasoning through storage and CLI output.
 
-## Faz 4 — Graph sorguları
+## Phase 4 — Graph queries
 
-- Sembol bulma, callers/callees, bağımlılık, etki analizi ve bağlantı yolu gerçek indeks üzerinde beklenen sonuçları verir.
-- Döngü, yön, derinlik/sonuç sınırı, birden fazla aday ve erişilemeyen hedef test edilir; sınırlama/kesilme görünürdür.
-- Kısmi indeks ve gerçekten boş sonuç ayrılır; yokluk sonucu yalnızca belirtilen snapshot, kapsam ve desteklenen ilişkiler için verilir.
+- Verify find, callers/callees, dependencies, impact, and paths on real indexes.
+- Test cycles, direction, depth/results/work bounds, ambiguity, unreachable targets,
+  and visible truncation.
+- Distinguish partial indexes from empty results; scope absence claims precisely.
 
-## Faz 5 — AI context ve export
+## Phase 5 — AI context and export
 
-- Seçilen sembol/soru odağı için boyutu sınırlandırılmış, deterministik ve kaynak referanslı bağlam üretilir; bütçe birimi ve kesilme davranışı belgelenir/test edilir.
-- Export kimlik, kanıt, güven sınıfı, analiz bağlamı ve eksiklikleri korur; format sürümü ve tüketim sözleşmesi tanımlıdır.
-- LLM/API bağlantısı gerekmez. Copilot'a aktarımın ayrı gizlilik sınırı olduğu belgelenir.
+- Produce deterministic, bounded context with source references; document and test
+  the budget unit and truncation behavior.
+- Preserve identity, evidence, confidence, context, and limitations in versioned
+  exports.
+- Require no LLM/API connection. Document the separate AI data-transfer boundary.
 
-## Faz 6 — Incremental indexing
+## Phase 6 — Incremental indexing
 
-- Ekleme, düzenleme, silme, yeniden adlandırma ve proje/referans/analiz bağlamı değişikliklerinde etkilenen kayıtlar yenilenir; eski ilişkiler temizlenir.
-- Aynı son kaynak snapshot'ı için incremental ve temiz tam indeksin anlamsal sonuçları karşılaştırılıp eşitliği doğrulanır.
-- Değişiklik yokken tekrar indeksleme, yarıda kesilme/hata ve geçersizleşme senaryolarında tutarlılık ile güncellik durumu korunur. Watcher gerekmez.
+- Refresh affected records and remove obsolete relationships after add/edit/delete/
+  rename and project/reference/context changes.
+- Compare semantic results of incremental and clean full indexing for the same
+  final source snapshot.
+- Verify no-op, interruption, failure, invalidation, consistency, and freshness.
+  State actual invalidation granularity; no watcher is required.
 
-## Faz 7 — DI/HTTP analizi
+## Phase 7 — DI/HTTP analysis
 
-- Desteklenen DI kayıt/çözümleme ve HTTP endpoint/client kalıpları incelenen uygulamadan çıkarılır; destek matrisi ve kapsam dışı dinamik kalıplar belgelenir.
-- Somut fixture'larda olumlu/olumsuz örnekler, çoklu kayıt ve belirsiz endpoint eşleşmesi test edilir. Sezgisel eşleşmeler `exact` diye etiketlenmez.
-- UO.Graphs'e HTTP sunucusu veya ağ üzerinden endpoint keşfi eklenmez.
+- Extract bounded DI and HTTP declarations from the analyzed application, with a
+  support matrix and explicit dynamic limits.
+- Test positive/negative fixtures, multiple registrations, and ambiguous endpoints.
+  Do not label heuristic matching exact.
+- Add no product HTTP server or network endpoint discovery.
 
-## Faz 8 — Mediator/messaging analizi
+## Phase 8 — Mediator/messaging analysis
 
-- İlgili fazda belirlenen kütüphane/kalıplarda request/handler ve publish/consumer bağlantıları kanıt ve gerekçeyle çıkarılır.
-- Handler bulunamaması, birden çok consumer ve dinamik kayıt senaryoları belirsizliği korur; runtime teslim garantisi verilmez.
-- Ürünün kendi mimarisine mediator, event bus veya broker zorunluluğu eklenmez.
+- Extract supported request/handler and publish/consumer contracts with evidence.
+- Preserve uncertainty for missing handlers, multiple consumers, and dynamic
+  registration; give no delivery guarantee.
+- Add no mediator, event bus, or broker requirement to the product architecture.
 
-## Faz 9 — ABP/EF Core/Refit analizi
+## Phase 9 — ABP/EF Core/Refit analysis
 
-- İlgili fazda sınırlandırılan ABP, EF Core ve Refit kalıpları için desteklenen sürüm/kalıp matrisi, fixture'lar ve kaynak kanıtları bulunur.
-- Dolaylı veya convention tabanlı ilişkilerin çıkarım gerekçesi görünürdür; desteklenmeyen/dinamik yapı exact sonuç üretmez.
-- Analiz için migration çalıştırılmaz, gerçek veritabanı/HTTP servisi çağrılmaz. Ürün ABP uygulamasına dönüştürülmez.
+- Define separate version/API matrices, fixtures, and source evidence per module.
+- Explain convention-based inference and avoid exact claims for unsupported or
+  dynamic behavior.
+- Run no migrations, database/HTTP requests, or application host for analysis.
 
-## Faz 10 — VS Code GitHub Copilot Agent Skill
+## Phase 10 — VS Code GitHub Copilot Agent Skill
 
-- Skill yalnızca belgelenmiş CLI komutlarını kullanır; MCP veya servis gerektirmez. Kurulum/keşif adımları ve küçük bağlam kullanımı belgelenir.
-- Eksik CLI/SDK/assets, güven onayı yokluğu, kısmi/eski indeks ve komut hataları için talimatlar denenir; skill sessizce güven bayrağı eklemez, izin/politika aşmaz.
-- VS Code/Copilot üzerinde gerçek skill kullanımı ayrı doğrulanır. Yalnızca dosya incelemesi veya CLI testi varsa entegrasyon `NOT RUN` kalır.
-- Dışarı aktarılan bağlamın gizlilik sınırı açıkça anlatılır; CLI Copilot olmadan da çalışır.
+- Use documented CLI commands only; document installation, discovery, and bounded
+  context use without MCP or a service.
+- Exercise instructions for missing CLI/SDK/assets/trust, partial/stale indexes,
+  and command errors; do not silently grant trust or bypass permissions/policy.
+- Verify actual skill use in VS Code/Copilot separately. File checks and CLI tests
+  alone leave real integration `NOT RUN`.
+- Explain the external data boundary and keep the CLI independently usable.
 
-## Faz 11 — Performans, paketleme ve son denetim
+## Phase 11 — Performance, packaging, and final audit
 
-- Boyutu/özellikleri belirtilmiş temsili solution'larda tam/incremental indeks süresi, bellek, SQLite boyutu ve sorgu gecikmesi ölçülür; kabul bütçeleri ölçümden önce kaydedilir.
-- Temiz kurulum, `uographs` çağrısı, sürüm/help, indeks ve sorgu paket üzerinden denenir. SDK ve bağımlılıklar önceden hazırlanmışken offline çalışma gerçek koşullarda doğrulanır; otomatik runtime edinimi yoktur.
-- Paket içeriği, MIT/üçüncü taraf bildirimleri, sürümler/lock dosyaları ve varsa native varlıkların lisans/platform uyumu denetlenir.
-- Windows, Linux ve macOS üzerinde kurulum/build/ilgili test/CLI smoke sonuçları ayrı kaydedilir. Erişilemeyen platform `NOT RUN` ve açık eksik olarak kalır; çapraz derleme çalışma testi sayılmaz.
-- Yerellik, güven kontrolü, eksik analiz bildirimi, kapsam dışı işler ve Copilot gizlilik sınırı son kez denetlenir; kalan zorunlu eksikler kapatılmadan tam kabul verilmez.
+- Record budgets before measuring specified representative solutions: full and
+  incremental indexing, memory, SQLite size, and query latency.
+- Test clean tool installation, help/version, indexing, and queries from the
+  package. With SDK/assets prepared, verify operation under real network isolation.
+- Audit package payload, notices, licenses, versions/locks, and native platform assets.
+- Record installation/build/tests/smoke separately on Windows, Linux, and macOS.
+  Cross-compilation is not execution; inaccessible platforms remain `NOT RUN`.
+- Recheck locality, trust, partial-analysis reporting, scope, and Copilot privacy.
+  Packaging or publication alone does not close remaining release gates.

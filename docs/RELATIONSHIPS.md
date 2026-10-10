@@ -1,137 +1,115 @@
-# Faz 3 — Semantik ilişki sözleşmesi
+# Semantic relationship contract
 
-Merkezi sözleşme: `src/UO.Graphs.Core/Relationships.cs` içindeki
-`RelationshipKind` ve `RelationshipContract.Definitions`. JSON tür adları aşağıdaki
-büyük harfli adlardır. Contract v3; declaration identity v2 değişmez.
+The authoritative kind/direction table is `RelationshipContract.Definitions` in
+`src/UO.Graphs.Core/Relationships.cs`. Current query JSON is **v4**, SQLite schema
+**3**, and declaration identity **v2**. Phase 3 introduced the semantic edges;
+its former JSON v3/SQLite v2 output is preserved only in historical records.
 
-| Tür | Kaynak → hedef | Anlam |
+| Kind | Source → target | Static meaning |
 | --- | --- | --- |
-| DECLARES | doğrudan sahip → declaration | Solution/project/assembly/namespace/type/member sahipliği; partial konumları ayrı occurrence |
-| PROJECT_REFERENCES | referans veren proje → referans verilen proje | Seçilen bağlamdaki değerlendirilmiş MSBuild ProjectReference; eksik veya bağlamı uyuşmayan hedef unresolved |
-| INHERITS | türeyen tip → doğrudan base class/interface | Yazılı base-list bağlaması; interface→interface dahil, transitif kapanış değil |
-| IMPLEMENTS | implementing class/struct → doğrudan interface veya implementing member → interface member | Roslyn `FindImplementationForInterfaceMember`; explicit, inherited ve default member eşlemeleri Roslyn'in sonucudur |
-| OVERRIDES | overriding üye → hemen overridden üye | Method/property/event sembolünün `Overridden*` hedefi |
-| USES_TYPE | kapsayan declaration → bağlanan tip | Kaynakta type syntax ve object creation; generic argümanlar ayrıca kaydedilir |
-| REFERENCES | kapsayan declaration → başvurulan üye | Field/property/event veya method group; invocation iddiası içermez |
-| CALLS | caller → compile-time target | Invocation, constructor, accessor veya desteklenen operator bağlaması; runtime dispatch garantisi değildir |
+| DECLARES | Direct owner → declaration | Solution/project/assembly/namespace/type/member ownership; partial locations are separate occurrences |
+| PROJECT_REFERENCES | Referencing project → referenced project | Evaluated MSBuild reference in selected context; missing/mismatched targets unresolved |
+| INHERITS | Derived type → direct base class/interface | Bound written base list, including interface inheritance; not transitive closure |
+| IMPLEMENTS | Implementing type/member → interface/member | Roslyn interface implementation, including inherited/explicit/default-member mappings |
+| OVERRIDES | Overriding member → immediate overridden member | Bound method/property/event override |
+| USES_TYPE | Containing declaration → bound type | Type syntax and creation evidence; generic arguments separately recorded |
+| REFERENCES | Containing declaration → member | Field/property/event or method group use, not invocation |
+| CALLS | Caller → compile-time target | Invocation, constructor, accessor, or supported operator binding |
 
-`exact` bu tablodaki **statik anlamı** kanıtlar. Interface çağrısı interface slotuna,
-virtual çağrı seçilen base/override slotuna bağlanır; receiver çalışma anında hangi
-nesne olacak sorusu çözülmez. `base.M()` ile virtual `x.M()` occurrence gerekçeleri
-ayrıdır. Bütün implementasyonlar `CALLS` hedeflerine genişletilmez. Bu faz
-`MAY_DISPATCH_TO` veya başka `inferred` edge üretmez; güven modeli inferred değerini
-korur. Dynamic/delegate/reflection runtime hedefi kanıtsız tahmin edilmez.
+`exact` proves these static meanings. Interface calls bind to interface slots;
+virtual calls bind to the selected base/override slot. `base.M()` and virtual
+`x.M()` retain different occurrence explanations. Implementations are not expanded
+into exact CALLS. The semantic extractor produces no MAY_DISPATCH_TO expansion;
+later framework extractors have separately labeled inferred candidates.
 
-## İlişki ve occurrence
+## Relationships, occurrences, and endpoints
 
-- Tekil ilişki anahtarı: kind + source symbol ID + target symbol ID (veya boş) +
-  project context ID + confidence. Aynı caller/target çifti tek ilişkidir.
-- Occurrence: ilişki ID, analysis ID, context ID, dosya, 1 tabanlı satır/sütun
-  aralığı (son hariç), analiz edilen metnin SHA-256 özeti, generated bayrağı,
-  gerekçe, `boundTarget` ve `relatedSymbols`.
-- Aynı iki metot arasındaki iki çağrı **iki occurrence** olarak kalır. Tek span'deki
-  getter/setter iki ayrı ilişkidir. Aynı sahibin farklı unresolved çağrıları tek
-  unresolved ilişki altında ayrı occurrence taşır. Unresolved `target` daima null;
-  aday semboller yalnızca `relatedSymbols` içindedir, kanıtlanmış hedef değildir.
-- Generic/reduced extension hedefi original definition'a normalize edilir;
-  çağrıdaki constructed imza `boundTarget` içinde korunur. Partial method çağrısı
-  definition part kimliğine normalize edilir.
-- Endpoint, declaration key, display name, assembly identity, varsa project ID ve
-  varsa entity ID taşır. Metadata/örtük constructor/generated-excluded hedefler için
-  sahte source declaration yaratılmaz; `entityId` null kalabilir. Harici ID analiz
-  eden proje bağlamı + assembly identity + declaration key üzerinden üretilir.
-- Kaynak proje hedefi ancak Roslyn compilation reference kimliğiyle bulunur; ad
-  benzerliği kullanılmaz. İndekslenen compilation ile assembly, parse seçenekleri,
-  kaynak içeriği ve temel compilation seçenekleri uyuşmuyorsa hedef ayrı reference
-  sembolü olarak kalır, `relationshipContextMismatch` ve partial raporlanır.
-- DECLARES için declaration span'ı, örtük namespace/assembly için proje dosyası
-  kanıtı kullanılır. PROJECT_REFERENCES için değerlendirilmiş öğe ve proje dosyasının
-  hash'i kullanılır; `1:1–1:1` **XML öğesinin hassas konumu değildir**. Gerekçe bunu
-  belirtir. Call-site kayıtları gerçek Roslyn syntax span'larıdır.
-- İlişki ID'si konumdan bağımsızdır; occurrence kimliği kaynak konumu/hash/gerekçeye
-  bağlıdır. Occurrence ID'leri taşınabilir declaration ID garantisinedahil değildir.
+- Relationship identity includes kind, source ID, target ID or empty value,
+  project context, and confidence. Repeated caller/target uses share an edge.
+- Occurrences retain relationship/analysis/context IDs, file, one-based line/column
+  range with exclusive end, decoded-source SHA-256, generated flag, reason,
+  `boundTarget`, and `relatedSymbols`.
+- Two calls between the same methods remain two occurrences. Getter/setter uses at
+  one span remain separate edges. Different unresolved calls by one owner can share
+  a null-target edge but retain their own occurrence evidence. Candidate symbols
+  are related symbols, never asserted targets.
+- Generic/reduced extension targets normalize to original definitions; constructed
+  call signatures stay in boundTarget. Partial calls normalize to the definition part.
+- Endpoints retain declaration key, display name, assembly identity, and optional
+  project/entity IDs. Metadata, implicit constructors, and excluded generated
+  declarations do not become fake source entities. External IDs include the
+  analyzing project context, assembly identity, and declaration key.
+- Source-project endpoints require matching Roslyn compilation references, not
+  names. Context mismatches remain separate reference symbols and report
+  `relationshipContextMismatch` with partial coverage.
+- DECLARES uses declaration spans, or project-file evidence for implicit namespace/
+  assembly containers. PROJECT_REFERENCES uses evaluated items and project-file
+  hash; `1:1–1:1` is explicitly not an exact XML element span. Calls use real syntax spans.
+- Relationship IDs are location-independent. Occurrence IDs depend on source
+  location/hash/reason and do not inherit portable declaration-ID guarantees.
 
-## Destek matrisi
+## Semantic support matrix
 
-| Kalıp | Bu fazdaki davranış | Sınır |
+| Pattern | Behavior | Limit |
 | --- | --- | --- |
-| Normal invocation / overload | `IInvocationOperation.TargetMethod` ile exact CALLS | CandidateSymbol hedefe yükseltilmez |
-| Generic invocation | OriginalDefinition hedefi, constructed imza occurrence | Generic argüman runtime tip analizi yapılmaz |
-| Extension method | ReducedFrom/original static declaration hedefi | Receiver tipi/metot adı üzerinden eşleştirme yok |
-| Object creation, target-typed new, constructor initializer | `IObjectCreationOperation.Constructor` / invocation ile exact CALLS | Roslyn operation'da görülen örtük base initializer span'ı declaration olabilir; sentezlenen record/primary-constructor lowering tam kapsamda değil |
-| Property/indexer read | REFERENCES property + CALLS getter | Getter gövdesi kendi accessor caller'ına aittir |
-| Simple write, compound write, increment/decrement | Setter; read/write halinde getter ve setter | Ref-return write getter kullanır; setter uydurulmaz |
-| Event add/remove | REFERENCES event + CALLS add/remove accessor | Event invoke delegate hedefi unresolved |
-| Method group / delegate creation | `IMethodReferenceOperation` ile REFERENCES | Conversion metodu invocation değildir; hedef metoda CALLS eklenmez |
-| Delegate invocation | CALLS unresolved; Invoke signature related symbol | Atama/data-flow/multicast hedef çözümü yok |
-| Local function | Ayrı lexical declaration; çağrılar semantik hedefe | Aynı adlı farklı lexical scope'lar birleşmez |
-| Lambda / anonymous method | Ayrı lexical lambda declaration; gövde çağrıları lambda'dan çıkar | Delegate üzerinden runtime invocation unresolved; gövde dış metoda taşınmaz. Expression-tree içindeki bağlama da çalıştırma garantisi vermez |
-| Interface / virtual / explicit implementation | Compile-time slot CALLS; ayrı IMPLEMENTS / OVERRIDES | Runtime implementation expansion yok |
-| Partial type/method | Tek declaration; bütün kaynak occurrence'ları | Eksik/generated-excluded kaynaklar tamamlanmış sayılmaz |
-| External library call | Assembly identity ve documentation key taşıyan exact endpoint | Harici library gövdesi analiz edilmez |
-| Dynamic invocation/creation/member | Hedefsiz unresolved CALLS/REFERENCES | İsim benzerliğiyle hedef üretilmez |
-| Reflection / Delegate.DynamicInvoke | API çağrısı exact; runtime hedef ayrıca unresolved | Standart MethodBase/MethodInfo.Invoke ve Delegate.DynamicInvoke tanınır; diğer reflection kalıpları için hedef çözümü taahhüdü yok |
-| `nameof` | İç üyeler REFERENCES olabilir; CALLS üretilmez | Compile-time işlem |
-| User-defined binary/unary/conversion operator | IOperation.OperatorMethod CALLS | Diğer örtük lowering/protokoller kapsam dışı |
-| Hatalı/ambiguous invocation | Hedefsiz unresolved, adaylar ve gerekçe | Hatalı executable declaration içindeki başarılı görünen recovery binding de exact yapılmaz |
+| Invocation/overload | Exact IInvocationOperation.TargetMethod | Candidate symbols never promoted |
+| Generic call | OriginalDefinition edge, constructed occurrence | No runtime generic type analysis |
+| Extension method | ReducedFrom/original static declaration | No receiver/name guessing |
+| Creation, target-typed new, constructor initializer | Bound constructor/invocation CALLS | Implicit base span may be the declaration; synthesized lowering not exhaustive |
+| Property/indexer read | REFERENCES + getter CALLS | Getter body belongs to its accessor caller |
+| Write/compound write/increment | Setter; getter too for read/write | Ref-return write uses getter, no invented setter |
+| Event add/remove | REFERENCES + accessor CALLS | Event invocation's delegate target unresolved |
+| Method group/delegate creation | IMethodReferenceOperation REFERENCES | Conversion is not invocation |
+| Delegate invocation | Unresolved CALLS, Invoke signature as related symbol | No assignment/data-flow/multicast resolution |
+| Local function | Separate lexical declaration and semantic target | Equal names in different scopes remain distinct |
+| Lambda/anonymous method | Separate caller for body calls | Runtime delegate invocation unresolved; expression-tree binding is not execution |
+| Interface/virtual/explicit implementation | Compile-time CALLS, separate IMPLEMENTS/OVERRIDES | No runtime expansion |
+| Partial declaration | Shared declaration, multiple source occurrences | Excluded/missing source stays incomplete |
+| External call | Assembly/documentation-key endpoint | External body not analyzed |
+| Dynamic invocation/creation/member | Unresolved CALLS/REFERENCES | No name-based target |
+| Reflection/Delegate.DynamicInvoke | Exact API call plus unresolved runtime target | Recognizes MethodBase/MethodInfo.Invoke and DynamicInvoke; no universal reflection resolution |
+| nameof | Member REFERENCES where applicable | No CALLS |
+| User-defined binary/unary/conversion operator | IOperation.OperatorMethod CALLS | Other implicit protocols/lowering not exhaustive |
+| Invalid/ambiguous call | Unresolved, reason and candidates | Recovery binding inside erroneous executable declarations not exact |
 
-`USES_TYPE` bir bütün-program tip/veri akışı analizi değildir. Explicit type syntax,
-`var` için Roslyn'in bağladığı tip ve creation tipi kapsamdadır; tamamen örtük
-conversion/generic-inference bağımlılıklarının eksiksiz kapanışı taahhüt edilmez.
-Local variable/parameter referanslarının kendi başına graph varlığı olması bu faza
-dahil değildir. Array/pointer tip bağımlılığı element tipe indirgenir.
+USES_TYPE is not whole-program type/data-flow analysis. Explicit type syntax,
+Roslyn-bound `var`, and creation types are covered; no exhaustive closure over
+implicit conversions/generic inference is promised. Parameters/local variables are
+not standalone graph entities. Arrays/pointers reduce to element types.
 
-Foreach/await/using disposal, pattern/deconstruction lowering, function pointers,
-collection expressions ve synthesized members için eksiksiz çağrı çıkarımı yoktur.
-Bu kaynaklardaki normal explicit invocation'lar yine analiz edilir. Snapshot
-limitations ve bu matris dışında **ilişki yokluğu sonucu çıkarılamaz**.
-Derleme hataları analysis diagnostics ve partial kapsamında kalır. Hata içermeyen
-bağımsız bir declaration analiz edilebilir; bozuk bir member tüm projeyi sahte
-başarılı veya bütünüyle boş graph'a dönüştürmez.
+No exhaustive call extraction for foreach/await/using disposal, pattern or
+deconstruction lowering, function pointers, collection expressions, and synthesized
+members. Ordinary explicit calls within those sources are still analyzed.
+Absence outside this matrix is not evidence. Compilation errors remain diagnostic
+and partial; valid independent members can still contribute exact relationships.
 
-## Kalıcılık ve CLI sınırı
+## Persistence and querying
 
-SQLite schema v2, `relationships` ve `occurrences` tablolarını ekler. Analysis,
-entities ve iki yeni tablo aynı transaction içinde değiştirilir. Occurrence foreign
-key denetlenir; başarısız replacement eski snapshot'ı ve schema sürümünü korur.
-Schema v1 salt okunur sorgulanabilir; ilişkiler boş döner ve eski analysis sürümü/
-limitations korunur. Başarılı yeniden index v2'ye atomik geçer. Bilinmeyen schema
-sürümleri değiştirilmez.
+Schema 3 atomically replaces analysis, entities, endpoints, relationships, and
+occurrences, with foreign-key checks. Failures preserve the old snapshot/schema.
+Unknown schemas are not overwritten; status can read supported legacy schemas,
+but current queries require re-indexing schemas 1/2.
 
-`index` ve `status`: `relationshipCount`, `occurrenceCount`.
-`query find`: eşleşen entity'lere bitişik ilişkiler ve bu ilişkilerin occurrence'ları,
-`relationships`/`occurrences` alanlarında döner. Endpoint gömülü sembol bilgisi taşır;
-sonuç entity listesi komşu düğümlerle genişletilmez. Bu ekleme Faz 3 kanıt okumasıdır;
-callers/callees, traversal, impact, export veya diğer Faz 4–5 komutları eklenmedi.
+Index/status report relationshipCount and occurrenceCount. Current find returns
+v4 query items, not the old Phase 3 adjacent relationship arrays. Use traversal
+`items[].path[]`, context, or export for relationship/occurrence evidence. See
+[QUERIES](QUERIES.md) and [CONTEXT-EXPORT](CONTEXT-EXPORT.md).
 
-Test kanıtı: `RelationshipTests`, `Phase3Tests`, `StorageTests` ve korunan Faz 2
-kabul testleri. Beklenen hedefler ve yasak bağlantılar ayrı assertion'larla sınanır;
-caller'ın exact CALLS hedef kümesinin tamamı da karşılaştırılır. Gerçek koşu
-sonuçları [STATUS](STATUS.md) içindedir.
+Tests include RelationshipTests, Phase3Tests, StorageTests, and workspace
+regressions. Assertions compare full exact-target sets and forbidden connections,
+not only counts. Actual executions are recorded in [STATUS](STATUS.md).
 
+## Framework relationship extensions
 
-## Faz 7 ekleri
+| Area | Additional directions |
+| --- | --- |
+| DI/HTTP | Registration → service REGISTERS; registration → implementation IMPLEMENTED_BY; registration → factory USES_FACTORY; constructor/handler → parameter service INJECTS; endpoint → handler HANDLED_BY; action → constructor candidate ACTIVATES |
+| Messaging | Handler → message HANDLES; consumer → message CONSUMES; caller → message DISPATCHES/PUBLISHES; message → candidate POSSIBLE_TARGET; behavior → message BEHAVIOR_FOR; message → behavior POSSIBLE_BEHAVIOR |
+| ABP | Service → interface APP_SERVICE_CONTRACT; module → dependency MODULE_DEPENDS_ON; repository use/declaration → entity REPOSITORY_ENTITY |
+| EF Core | Context/member → entity CONTEXT_ENTITY; configuration → entity CONFIGURES_ENTITY; mapping declaration → entity MAPS_ENTITY |
+| Refit | Interface method → client contract HTTP_CONTRACT; caller → client contract INVOKES_HTTP; client contract → unresolved remote endpoint POSSIBLE_ENDPOINT |
 
-REGISTERS, IMPLEMENTED_BY, USES_FACTORY, INJECTS, HANDLED_BY ve ACTIVATES merkezi
-ilişki sözleşmesine eklendi. Kaynak/kanıt kuralları değişmez. `CALLS` runtime DI
-implementation'ına genişletilmez. Yönler, metadata, güven sınıfları ve desteklenen
-kalıplar [FRAMEWORKS](FRAMEWORKS.md)'tedir.
-
-
-## Faz 8 ekleri
-
-HANDLES / CONSUMES / DISPATCHES / PUBLISHES mesaj sözleşmelerine bağlanır.
-POSSIBLE_TARGET mesajdan handler/consumer metoduna inferred aday yönüdür;
-BEHAVIOR_FOR / POSSIBLE_BEHAVIOR pipeline sözleşmesini ve olası katılımcıyı ayırır.
-Runtime seçimi unresolved kalır. Tam yön ve kimlik sözleşmesi: [MESSAGING](MESSAGING.md).
-
-
-## Faz 9 ekleri
-
-APP_SERVICE_CONTRACT: service → interface; MODULE_DEPENDS_ON: module → dependency;
-REPOSITORY_ENTITY: use/declaration → entity; CONTEXT_ENTITY: context/member → entity;
-CONFIGURES_ENTITY: configuration → entity; MAPS_ENTITY: mapping declaration → entity;
-HTTP_CONTRACT: Refit method → client contract; INVOKES_HTTP: caller → client contract;
-POSSIBLE_ENDPOINT: client contract → unresolved remote endpoint. Exact kaynak
-bildirimi runtime garanti değildir. ABP candidate HANDLED_BY inferred kalır.
-Sürüm, anlam ve destek sınırları: [ABP-EF-REFIT](ABP-EF-REFIT.md).
+These preserve source evidence and confidence. They do not change CALLS semantics.
+ABP endpoint-candidate HANDLED_BY is inferred. Detailed boundaries are in
+[FRAMEWORKS](FRAMEWORKS.md), [MESSAGING](MESSAGING.md), and
+[ABP-EF-REFIT](ABP-EF-REFIT.md).

@@ -1,92 +1,92 @@
-# Yerel yazma sınırı ve hata dayanıklılığı
+# Local writes, trust, and failure handling
 
-UO.Graphs sorgu/context/export sırasında MSBuild başlatmaz. Kaynak `.cs`, proje,
-solution ve config dosyalarını uygulama koduyla değiştirmez. Index SQLite ve
-`.writer.lock`, `-wal`, `-shm`, `-journal` sidecar'larını yalnız seçilen `--db`
-hedefinin yanında oluşturur. Varsayılan hedef çalışma dizinindeki `.uographs`'tır.
-Progress/error stderr, JSON stdout'tur; otomatik log dosyası yoktur. Ölçüm ve test
-scriptleri yeni, açıkça belirtilen evidence dizinine yazar; sentetik üretici mevcut
-hedefi reddeder. Fixture kaynak değişimleri yalnız benchmark üreticisinin kendi
-kontrollü dataset'inde yapılır; kullanıcı kaynakları benchmark girdisi değildir.
+Queries/context/export do not start MSBuild. Product code does not edit analyzed
+C#, project, solution, or configuration files. Indexing writes the selected SQLite
+database and adjacent writer-lock/WAL/SHM/journal files, defaulting to `.uographs`
+in the current directory. Progress/errors use stderr; JSON uses stdout; no automatic
+log file is created.
 
-## MSBuild/custom tasks güven sınırı
+Test/measurement scripts write explicitly selected evidence directories. The
+synthetic generator refuses existing destinations. Benchmark source mutations are
+limited to its controlled generated datasets, not user projects.
 
-`--trust-project` hem full hem incremental için, proje evaluation'ından önce
-zorunludur. NuGet restore/download/update CLI tarafından çağrılmaz. Ancak MSBuild
-SDK resolver, import, property function, target ve custom task'ları; izin verilmiş
-source generator'lar normal kullanıcı yetkileriyle kod çalıştırabilir. Dosya yazma,
-proses başlatma ve ağ I/O bu kodlar tarafından yapılabilir. Workspace load SDK'nın
-obj altındaki generated dosyalarını üretebilir. Trust bir sandbox değildir; aracı
-başlatan kullanıcı, hedef projeye bu yürütme yetkisini verdiğini bilmelidir.
+## MSBuild and custom-code boundary
 
-`TrustGatePrecedesMsbuildTargetSideEffects` gerçek hazırlanmış fixture'a
-`BeforeTargets=ResolveAssemblyReferences` ve `WriteLinesToFile` ekler. Bayrak yokken
-marker oluşmaz; bayrakla workspace yüklenirken kontrollü marker oluşur; kaynak
-proje metni aynı kalır. Marker indeks kökünün dışında kontrollü test klasöründedir.
-Bu, ürünün custom task yan etkilerini engellediği iddiasının neden yapılamayacağını
-somut olarak gösterir. İncelenen girdiler analiz sırasında değişirse publication
-reddedilir; önceden commit edilmiş graph korunur.
+Full and incremental indexing require `--trust-project` before evaluation. The
+CLI does not invoke automatic NuGet restore/download/update. However SDK resolvers,
+imports, property functions, targets, custom tasks, and permitted generators run
+with user privileges and may write files, start processes, or use the network.
+Workspace loading can generate standard obj files. Trust is not a sandbox.
 
-Kaynağın hiç değişmemesi zorunluysa salt okunur filesystem kopyası ve yazılabilir
-ayrı obj/output alanı kurum tarafından hazırlanmalıdır. Ağ/proses/filesystem
-izolasyonu OS/container/agent politikasıdır; ürün terminal izinlerini yükseltmez.
-Custom task veya generator'ın kötü niyetli kaynak yazımını CLI önleyemez.
+`TrustGatePrecedesMsbuildTargetSideEffects` adds a real BeforeTargets=
+ResolveAssemblyReferences target with WriteLinesToFile to a controlled fixture.
+Without trust its marker is absent; with trust workspace loading writes the marker
+outside the index root in a controlled test directory. Project source text stays
+unchanged. This demonstrates why custom-code side effects cannot be ruled out.
+Observed input changes during indexing reject publication and preserve the last commit.
 
-## Doğrulanan hata yolları
+If sources must be immutable, the organization must prepare a read-only copy and
+separate writable obj/output locations. OS/container/agent policy provides network,
+process, and filesystem isolation; the product does not elevate terminal permissions.
+It cannot prevent malicious tasks/generators from editing sources.
 
-- Transaction cancellation ve gerçek proses SIGINT (exit 130) önceki snapshot'ı
-  korur. Hazırlık sırasında SIGKILL ve eşzamanlı index (exit 10) ayrı test edilir.
-  Writer lease analizden SQLite commit'e kadar tutulur. WAL publication ortasındaki
-  kill ve eşzamanlı okuyucular mevcut Phase6 regresyon testlerindedir; gerçek koşu
-  sonuçları STATUS'ta ayrıdır.
-- `PRAGMA max_page_count` üzerinden test-only internal seam ile gerçek SQLite
-  **SQLITE_FULL (13)** oluşturulur. Rollback, eski graph ve sonraki başarılı retry
-  sınanır. Bu, fiziksel diskin bütününü doldurma testi değildir; disk image/quota
-  kabulü **NOT RUN**. Üretim komutunda fault-injection seçeneği yoktur.
-- Bilinmeyen schema exit 6; eski desteklenen şemalar gerektiğinde açık re-index
-  ister. Bozuk/non-SQLite dosya overwrite edilmez. Bozuk global.json ve MSBuild
-  props analiz başlamadan hata verir; kaynak ve DB korunur.
-- DB yolu bilinçli canonicalize edilir (aynı DB alias'ı writer kilidini atlatmaz).
-  Yazma sidecar'ı symlink ise reddedilir. Snippet'te `..`, outside-root,
-  symlink/reparse point, secret/config ve hash uyuşmazlığı metin sızıntısını önler.
-  Fingerprint symlink girdileri reddeder. MSBuild bağlantılı dış kaynakları
-  değerlendirebilir; `--root` bir işletim sistemi erişim sandbox'ı değildir.
-- SQL değerleri parametrelidir; literal `%`, `_`, apostrophe ve SQL/shell payload
-  regresyonları vardır. SQL tür/yön parçaları kontrollü enum/placeholder'dan gelir.
-- Hazırlık için `ProjectPreparation` tarafından başlatılan dotnet/MSBuild
-  proseslerinde stdout **32 Mi karakter**, stderr **1 Mi karakter** ile sınırlıdır;
-  aşım exit 4, snapshot publication yok. Parent exit sonrasındaki pipe drain dahil
-  iki dakika timeout ve cancellation uygulanır. Reader testlerine ek olarak gerçek
-  dotnet parent/child ile canlı process-tree iptali, parent çıktıktan sonra child'ın
-  tuttuğu stdout/stderr pipe drain iptali ve büyük stderr reddi geçti. Post-exit
-  handshake ve 250 ms bekleme kontrolü, anlık scheduling gecikmesinin başarı
-  sayılmasını önler. Yeniden parent atanmış child'ı ürünün öldürdüğü iddia edilmez;
-  test kendi child'ını ayrıca temizler. Gerçek `IncrementalIndexer` yolunda izinli
-  kooperatif generator'ın token'ı alıp iptali gözlemlemesi test edildi. Cancellation
-  kooperatiftir; generator token'ı ignore ederse process düzeyindeki kurum timeout'u
-  gereklidir. Kötü niyetli generator'ın zorla durdurulması **NOT RUN**.
-  Bu stream sınırları ve iki dakika deadline Roslyn `MSBuildWorkspace` BuildHost'una
-  veya generator yürütmesine genellenmez. BuildHost'un ayrı başlangıç/IPC yolu
-  vardır; aynı proses içindeki generator doğrudan Console'a yazabilir. Güvenilmeyen
-  build kodunun bütün çıktı/proses kaynak sınırları kurum izolasyonuyla sağlanmalıdır.
-- Context max-chars tüm JSON ve LF'yi sayar. Bütçe altında bütün kayıtlar çıkarılır,
-  truncation korunur; minimum zarf sığmazsa stdout boş/exit 2. Export record limitleri
-  vardır; export/query için toplam byte sınırı iddiası yoktur. Büyük diagnostic veya
-  metadata zarfı büyük olabilir. Kaynak tarafından türetilen metin komut değildir.
+## Tested failure paths and their limits
 
-## Export ve skill kurulumu
+- Transaction cancellation and real SIGINT (exit 130) preserve the old snapshot.
+  SIGKILL during preparation, WAL-publication process kill, concurrent readers, and
+  competing writers (exit 10) have separate tests. Lease spans analysis through commit.
+- A test-only internal seam sets PRAGMA max_page_count to provoke real
+  **SQLITE_FULL (13)**, then verifies rollback, retained graph, and a successful
+  retry. This is not physical disk exhaustion; disk-image/quota acceptance is
+  **NOT RUN**. No production fault-injection option is exposed.
+- Unknown schemas fail with exit 6. Supported old schemas require explicit re-index
+  where necessary. Corrupt/non-SQLite files are not overwritten. Invalid global.json
+  and props fail without publishing a replacement.
+- Database paths are canonicalized to avoid alias-based lease bypass. Symlinked
+  write sidecars are rejected. Snippet traversal/outside-root/symlink/secret/config/
+  hash checks prevent disallowed text reads; fingerprints reject symlink inputs.
+  MSBuild may evaluate linked external sources, so --root is not an OS access sandbox.
+- SQL values are parameters; literal percent/underscore/apostrophe and SQL/shell
+  payload regressions exist. Structural SQL fragments come from controlled enums
+  or placeholders. Source-derived labels and evidence are never shell instructions.
+- ProjectPreparation's dotnet/MSBuild subprocess stdout is capped at **32 Mi
+  characters**, stderr at **1 Mi characters**. Overflow yields exit 4 without
+  publication. A two-minute timeout/cancellation covers post-parent-exit pipe drain.
+  Real parent/child, post-exit handshake, 250 ms delay, cancellation, and large-stderr
+  tests distinguish actual blocking from scheduling delay. The product does not
+  claim to kill a reparented child; tests separately clean up their own child.
+- A real IncrementalIndexer test verifies a cooperative permitted generator receives
+  and observes cancellation. Generators that ignore the token require external
+  process policy; forced malicious-generator termination is unverified. The above
+  stream caps/deadline do not apply universally to Roslyn MSBuildWorkspace BuildHost
+  or in-process generators, which may write directly to Console.
+- Context max-chars includes the complete JSON and LF. Whole records are pruned;
+  truncation remains. An undersized mandatory envelope yields empty stdout/exit 2.
+  Query/export have record bounds, not total byte bounds; large metadata or
+  diagnostics can still produce large output.
 
-CLI export stdout üretir; shell'in `>` ile mevcut dosyayı truncate etmesini CLI
-önleyemez. `scripts/safe_export.py NEW_FILE -- uographs export ...` exclusive
-`xb` oluşturur, mevcut dosya veya symlink hedefini reddeder; shell çalıştırmaz.
-Başarısız child'ın kısmi dosyası inceleme için kalır ve başarısız exit korunur.
-POSIX shell'de alternatif açık `set -C` (noclobber) politikasıdır.
+The recorded restricted BuildHost and VSTest IPC failures and later successful
+permitted runs are distinct evidence in [STATUS](STATUS.md). A timeout alone does
+not prove a missing package payload or a specific permissions failure.
 
-`scripts/install_skill.py` mevcut skill'i birleştirmez/overwrite etmez; symlink
-hedefi reddeder. Tool-path testi kullanıcının global kurulumuna dokunmaz. Tüm bu
-yol kontrolleri eşzamanlı saldırgan bir kullanıcının filesystem'i değiştirmesine
-karşı atomik sandbox garantisi değildir; hedef dizin yalnız yetkili kullanıcıya
-yazılabilir olmalıdır.
+## Export and skill installation
 
-Kod/graph upload, telemetry, MCP/HTTP/LLM servisi veya API key eklenmedi. Copilot'a
-elle bağlam verilmesi ayrı kurum veri politikasına tabidir.
+CLI export writes stdout and cannot prevent shell `>` from truncating an existing
+file. Use:
+
+```sh
+python3 scripts/safe_export.py NEW_FILE -- uographs export --format ndjson
+```
+
+The helper uses exclusive xb creation, refuses existing/symlinked targets, and runs
+argv without a shell. On child failure it preserves the partial file for inspection
+and the failed exit. POSIX noclobber (`set -C`) is a separate explicit shell policy.
+
+The skill installer refuses existing/symlinked destinations, with no merge or
+overwrite. Isolated tool-path tests do not change a user's global install. These
+path checks are not a race-proof sandbox against another user concurrently mutating
+the filesystem; destinations should be writable only by authorized users.
+
+The product has no source/graph upload, telemetry, MCP/HTTP/LLM service, or API-key
+requirement. Explicit CI package publication is separate from runtime. Manually
+sharing graph/context with Copilot is governed by the organization's AI data policy.

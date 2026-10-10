@@ -1,200 +1,169 @@
-# Faz 5 — context ve export sözleşmesi
+# Context and export contract
 
-Faz 5 tabanı ürün 0.5.0; güncel ürün 0.9.0. Çıktılar `formatVersion: 1` kullanır; query/index JSON v4 ve
-SQLite schema 3 değişmez. Komutlar tek read-only transaction ile aynı snapshot'ı
-okur. MSBuild/restore/LLM/embedding/uzak servis/renderer çalıştırmazlar. Eski SQLite
-schema 1/2 için exit 4 ve açık yeniden index gerekir; otomatik migration yoktur.
+Current product: **0.9.0**; delivery `formatVersion: 1`, query/index contract 4,
+SQLite schema 3. Each command reads one snapshot in a read-only transaction,
+without MSBuild, restore, LLMs, embeddings, remote services, or renderers.
+Legacy SQLite schemas 1/2 require explicit re-indexing (exit 4).
 
 ```sh
 uographs context Greet --max-chars 12000 --format json
-uographs context <exact-symbol-id> --include-source --max-chars 20000
+uographs context '<exact-symbol-id>' --include-source --max-chars 20000
 uographs export --format json
-uographs export --format ndjson --symbol <exact-symbol-id> --depth 2
+uographs export --format ndjson --symbol '<exact-symbol-id>' --depth 2
 uographs export --format mermaid --symbol Greet --depth 1
 uographs export --format dot --symbol Greet --depth 1
 ```
 
-Hepsi `--db <path>` kabul eder. Varsayılan `.uographs/graph.db`. Tool kurulumu henüz
-Faz 11 kapsamında yapılmadı; repoda `dotnet run --project
-src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore --` öneki kullanılır.
+All accept `--db <path>`, default `.uographs/graph.db`, and freshness options.
+The tool is packaged; see [RELEASE](RELEASE.md). From a source build, use
+`dotnet run --project src/UO.Graphs.Cli --no-build --no-restore --` as the prefix.
 
-## Sembol seçimi
+## Selection
 
-Önce tam ID, ardından case-sensitive tam entity adı/nitelikli adı. Tek exact
-sonuç seçilir. Birden fazla exact sonuçta `selectionRequired`, exit 7 ve adaylar
-döner; limit 1 de belirsizliği kaldırmaz. Harici endpoint yalnızca ID ile seçilir;
-entity veya kaynak declaration uydurulmaz.
+Resolution prefers exact ID, then case-sensitive exact entity name/qualified name.
+Multiple matches return `selectionRequired`, candidates, and exit 7, even with
+limit 1. External endpoints require IDs and never become fake source entities.
 
-Context exact bulamazsa ID sırasında en fazla **10000 entity** üzerinde .NET
-`OrdinalIgnoreCase` literal alt metin arar; ad veya nitelikli ad kullanılır.
-`%`, `_`, tırnak, shell metni özel anlam taşımaz. Tam doğal dil soru anlama veya
-fuzzy/semantik benzerlik iddiası yoktur. Lexical aday tek olsa bile otomatik
-seçilmez: `match: lexical`, `selected: null`, `selectionRequired`, exit 7. Adayın
-kesin ID'siyle tekrar çağrı gerekir. Aday yoksa `symbolNotFound`, exit 8.
-`searchScanLimit` varsa aranmamış kısımda eşleşme yokluğu iddia edilmez.
-Export `--symbol` yalnızca exact çözüm yapar; eksik/belirsiz odak için boş altgraph
-ve seçilen formatta outcome/aday metadata'sı döner (exit 8/7).
+If context has no exact match, it scans at most **10000 entities**, in ID order,
+using .NET OrdinalIgnoreCase literal substring matching. Percent, underscore,
+quotes, and shell text have no special meaning. This is not natural-language or
+semantic search. Even one lexical candidate remains unselected: `match: lexical`,
+`selected: null`, `selectionRequired`, exit 7. Repeat with the chosen ID. No
+candidate yields `symbolNotFound`, exit 8. `searchScanLimit` means the remaining
+snapshot was not searched and no absence claim covers it.
 
-Girdi uzunluğu 1..1024 UTF-16 code unit. `--` positional girdide option ayracıdır;
-öneriler shell komutu yerine `command` + `arguments` dizisi verir. Eksik sonuçta
-`template: true` ile daha kısa ad arama önerisi bulunur. Bunlar otomatik çalışmaz.
+Export `--symbol` uses exact resolution only. Missing/ambiguous focus produces an
+empty subgraph with outcome/candidate metadata in the selected format, exit 8/7.
+Input length is 1..1024 UTF-16 code units. Use `--` for positional option-like input.
+Follow-up suggestions are command/argument arrays, not executable shell strings;
+templates are labeled and never run automatically.
 
-## Sayısal sınırlar
+## Bounds
 
-| Seçenek | Context varsayılan | Export varsayılan | Kabul edilen aralık |
+| Option | Context default | Export default | Range |
 | --- | --- | --- | --- |
-| `--max-chars` | 12000 | Kullanılmaz | 1..1000000 |
+| `--max-chars` | 12000 | Not accepted | 1..1000000 |
 | `--max-nodes` | 40 | 1000 | 1..10000 |
-| `--limit` | 80 ilişki | 5000 ilişki | 1..10000 |
-| `--depth` | 1 | Seçili altgraph için 1 | 0..10 |
+| `--limit` | 80 relationships | 5000 relationships | 1..10000 |
+| `--depth` | 1 | 1 for focused subgraph | 0..10 |
 | `--max-edges` | 1000 | 10000 | 1..100000 |
-| `--evidence-limit` | 2 occurrence/ilişki | 20 occurrence/ilişki | 1..100 |
+| `--evidence-limit` | 2 occurrences/relationship | 20 occurrences/relationship | 1..100 |
 
-Kök `max-nodes` içinde sayılır; aday sayısı `min(limit,max-nodes)` ile sınırlıdır.
-Her iki yönde BFS uygulanır. İlişki önceliği CALLS; OVERRIDES/IMPLEMENTS/INHERITS;
-USES_TYPE/PROJECT_REFERENCES; REFERENCES; DECLARES şeklindedir. Aynı öncelikte
-ordinal ID belirler. Cycle/diamond düğüm ve ilişki çoğaltmaz. Inferred ilişkiler
-etiketiyle dahil edilir ve yakınlık için geçilebilir; exact'e yükseltilmez.
-Unresolved ilişki kanıtıyla taşınır, hedef null kalır ve üzerinden geçilmez.
-`--include-inferred`, `--direction`, `--edge-types` bu komutlarda kullanılmaz;
-ayrıntılı politika seçimi [query](QUERIES.md) komutlarındadır.
+The root counts toward max-nodes; candidates are bounded by min(limit,max-nodes).
+Collection uses BFS in both directions, prioritizing CALLS, then inheritance/
+implementation/overrides, type/project dependencies, and REFERENCES. DECLARES and all framework kinds
+share the remaining priority; ties use ordinal relationship ID.
+Cycles/diamonds do not duplicate nodes or edges. Inferred edges are included with
+their confidence and can be traversed; unresolved records retain null targets and
+are not traversed. These commands do not accept include-inferred, direction, or
+edge-types; use [queries](QUERIES.md) for those policies.
 
-Seçili altgraph, depth'ten küçük uzaklıktaki düğümlerin genişletilmesiyle toplanan
-ilişkileri içerir; sınır düğümlerinin kendi aralarındaki bütün ilişkileri içeren
-bir induced subgraph garantisi yoktur. Depth 0 yalnızca köktür. Sınırda atlanan
-ilişki `depth`, düğüm sınırı `maxNodes`, ilişki/aday sınırı `limit`/`candidateLimit`,
-çalışma sınırı `maxEdges`, occurrence sınırı `evidenceLimit` olarak görünür.
-Tek read transaction içindeki endpoint, ilişki, kaynak ve analiz kimlikleri korunur.
+A focused subgraph contains relationships collected while expanding nodes below
+the depth bound. It is not guaranteed to contain every edge among boundary nodes.
+Depth 0 keeps only the root. Omitted information is reported as depth, maxNodes,
+limit/candidateLimit, maxEdges, or evidenceLimit. Max-edges counts inspected
+adjacency rows, including repeated inspection from different endpoints but not
+SQL limit+1 sentinels; it does not bound physical SQLite reads or output bytes.
 
-`max-edges` uygulamada incelenen komşuluk satırlarını sayar; farklı uçtan tekrar
-okunan ilişki tekrar sayılır. SQL limit+1 sentinel sayaca girmez. Bu sınır SQLite'ın
-fiziksel sayfa okuması/sıralama maliyeti veya dosya boyutu garantisi değildir.
-Tam export'ta önce node ID sırasıyla sınırlı düğümler, ardından öncelik/ID sıralı
-ilişkiler okunur. Düğümleri dahil edilmemiş ilişkiler atlanır ve `maxNodes` bildirilir;
-böylece export'ta dangling hedef üretilmez. `--symbol` yokken `--depth` hatadır.
+Unfocused export first selects bounded nodes by ID, then bounded relationships by
+priority/ID. Relationships whose endpoints are excluded are omitted with maxNodes
+reported, so no dangling asserted targets are emitted. Depth without symbol is invalid.
+Final serialization orders nodes, relationships, and occurrences by ordinal ID.
 
-## Context JSON ve karakter bütçesi
+## Whole-output context budget
 
-Çıktı compact, tek JSON belge ve **tek LF**'dir. Ölçü, serialize edilmiş stdout'un
-Unicode scalar value sayısıdır: JSON anahtarları, boşluk, punctuation, escape
-karakterleri, metadata, `actualChars` alanı ve son LF **dahildir**. UTF-8 byte sayısı
-ve UTF-16 `Length` ile karıştırılmaz. JSON'daki `\uXXXX` escape'i yazıldığı altı
-karakter olarak ölçülür. Token sayısı veya token tahmini verilmez.
+Context is one compact JSON document plus **one LF**. The budget counts Unicode
+scalar values in the serialized stdout: keys, punctuation, escapes, metadata,
+`actualChars`, and the final LF. It is neither UTF-8 bytes, UTF-16 Length, nor tokens.
+A serialized `\uXXXX` counts as six characters. `budget` reports maxChars, unit,
+and actualChars; the counter includes its own digit count until stable.
 
-`budget: {maxChars, unit, actualChars}` gerçek çıktı uzunluğunu bildirir. Sayacın
-kendi hane sayısı da sabit noktaya kadar tekrar hesaplanır. Büyük çıktı string
-olarak kesilmez. Önce snippet metni, ardından uzak komşu kayıtları, düşük öncelikli
-ilişkiler, son adaylar ve son sorgu önerileri bütün kayıt olarak çıkarılır.
-`truncated: true` ve `truncationReasons: ["maxChars", ...]` bütçeye dahildir.
-Snippet metni çıkarılırken hash/missing/exclusion durumu korunur; `truncated`
-true olur. Semboller, kaynak konumları ve metin içindeki karakterler kesilmez.
+The writer removes whole records rather than cutting JSON strings. Snippet text,
+distant nodes/relationships, trailing candidates, and suggestions can be dropped;
+nearby flow/framework evidence is favored over generic type/reference/ownership
+records at equal distance. Truncation and uncertainty remain visible. Snippet
+status/hash/exclusion information survives text removal.
 
-Seçilen sembol, snapshot/analiz bağlamı, kapsam/eksikler, limitler, belirsizlik
-uyarıları, confidence/caller/callee sayımları ve snippet durumları zorunlu envelope'da
-kalır. Bu zorunlu envelope seçime göre değişir. Bütçe ona yetmezse **exit 2**,
-**boş stdout**, stderr'de gereken karakter sayısı ve bütçeyi artırma açıklaması gelir.
-Bu hata metni JSON stdout bütçesinin parçası değildir. Seçim hatalarının JSON'u da
-aynı bütçeye uyar; envelope bütçe hatası exit 7/8'den önce gelir.
+The mandatory envelope retains selection, snapshot/context, coverage/limitations,
+bounds, uncertainty, counts, and snippet states. If it cannot fit, exit **2** leaves
+stdout empty and reports the required size on stderr. That error takes precedence
+over selection exit 7/8. No partial or invalid JSON is emitted.
 
-Başlıca alanlar:
+| Field | Content |
+| --- | --- |
+| selected/candidates/nearby | Identity, name, kind, project, distance, confidence, source file/range/hash; no source text by default |
+| relationships | Original IDs, direction, kind/confidence/context, occurrences, reasons, bound targets/candidates, evidence truncation |
+| callSummary | Counts from the collected subgraph before character pruning, not repository totals; incomplete when collection/evidence is truncated |
+| confidenceSummary | Inferred/unresolved counts and uncertainty warnings retained through pruning |
+| analysisContext | Snapshot/version/source policy and relevant project SDK/TFM/configuration/language/preprocessor/skipped contexts; totalProjects covers the whole analysis |
+| completeness | Analysis coverage/limitations, separate from query truncation |
+| nextQueries | Exact-ID queries or explicit templates; no automatic runtime observation or indexing |
 
-- `selected`, `candidates`, `nearby`: kimlik, ad, tür, proje, uzaklık, confidence ve
-  dosya/satır/sütun/hash kaynak konumları. Varsayılan kaynak metni yoktur.
-- `relationships`: orijinal ID, yönlü source/target ID, tür, confidence, context ID,
-  occurrence kanıtları, gerekçe, bound target/related symbols ve evidence kesilmesi.
-- `callSummary`: karakter budaması **öncesi toplanan** altgraph'ta caller/callee ve
-  unresolved CALLS ilişki sayıları; tam repository toplamı değildir. Herhangi bir
-  arama/kanıt kesilmesi varsa `complete: false`. Budanmış ilişki ayrıntısı mevcut
-  olmasa bile sayım kapsamı bu alanda açıkça yazılır.
-- `confidenceSummary`: toplanan inferred/unresolved ilişki sayıları; uyarılar
-  karakter budamasıyla silinmez. Statik hedef runtime dispatch garantisi değildir.
-- `analysisContext`: snapshot zamanı/sürümleri, generated politikası, ilgili
-  projelerin TFM/configuration/SDK/language/preprocessor/atlanmış TFM bağlamı.
-  `totalProjects` bütün analizdeki proje sayısıdır. Ham compiler diagnostic metni
-  yerine `diagnosticsCount` taşınır; tamamı `status`/export'tadır.
-- `completeness`: analysis coverage ve limitations, sorgu kesilmesinden bağımsız.
-  `stale: notChecked` tüm çalışma dizininin freshness doğrulaması değildir.
-- `nextQueries`: tekrar sorgulanabilir kesin ID'ler veya açık template. Runtime
-  gözlemi, yeniden index ya da sonraki faz otomatik başlatılmaz.
+Context reports diagnostic counts instead of raw compiler diagnostic text; full
+diagnostics remain in status/export. Default stale is notChecked. Explicit freshness
+checks have their own cost and limitations, independent of snippet hash matching.
 
-## Kaynak ve gizlilik politikası
+## Source and privacy policy
 
-Kaynak okuma yalnızca `context --include-source` ile açılır. Yalnızca seçilen
-entity'nin en fazla **3** konumundan, konumun başlangıç satırından başlayarak en
-fazla **12 satır / 1200 Unicode scalar value** döner. Tek dosya en fazla **1 MiB**
-olabilir; fazla büyük dosya okunarak çıktıya eklenmez. Karakter sınırı surrogate
-pair bölmez. Snippet tam dosyayı amaçlamaz; küçük bir sembol/dosya doğal olarak bu
-limitlerin altında kalabilir. Export kaynak dosyalarını açmaz.
+Only `context --include-source` reads source text: up to **3 locations**, each at
+most **12 lines / 1200 Unicode scalar values**, starting at its declaration's first
+line. Files must be at most **1 MiB**. Surrogate pairs are not split. Small symbols
+or files can naturally fit in full. Export never opens source files.
 
-Dosya yolu snapshot root'un içinde olmalıdır. Yalnızca `.cs` uzantısı kabul edilir.
-Root'a göre yol bileşenlerinde gizli adlar, `bin`, `obj`, `node_modules` ve
-case-insensitive `secret`, `credential`, `password`, `token`, `privatekey`,
-`private-key`, `appsettings`, `config`, `.env` içeren adlar dışlanır. JSON/XML/YAML,
-project/props/targets/config dosyaları C# allowlist dışında kalır. Generated kaynak,
-root dışı yol ve root'un üst dizinleri dahil symlink/reparse point zinciri reddedilir.
-Bu konservatif dosya politikası, izinli sıradan `.cs` içindeki keyfi hardcoded
-secret'ları tanıyan bir DLP/secret scanner değildir. Açık kaynak aktarımı kurum
-politikasına göre seçilmelidir; graph isimleri ve yolları da hassas bilgi olabilir.
+Allowed files must be `.cs` inside the snapshot root. Hidden path components,
+bin/obj/node_modules, and names containing secret, credential, password, token,
+privatekey, private-key, appsettings, config, or .env (case-insensitively) are
+excluded. Non-C# configuration/project files are outside the allowlist. Generated,
+outside-root, and symlink/reparse-point paths, including root ancestors, are rejected.
+This path policy is not a DLP scanner for arbitrary hardcoded secrets in ordinary
+C# files; graph names and paths may also be sensitive.
 
-Tek okunan buffer BOM-aware decode edilir; Roslyn declaration/occurrence sözleşmesiyle
-aynı biçimde decoded text → UTF-8 → SHA-256 hesaplanır. Snapshot hash'iyle eşleşirse
-`snapshotMatched`; eşleşmezse `snapshotMismatch` ve `text: null`. `missing`,
-`excludedByPolicy`, `outsideRoot`, `symlinkExcluded`, `generatedUnavailable`,
-`rootUnavailable`, `fileTooLarge`, `invalidLocation`, `unreadable` durumları da
-kaynak metni döndürmez. Eşleşme yalnızca okuma anındaki dosya buffer'ı içindir;
-eşzamanlı dosya sistemi değişikliklerine karşı sandbox veya tüm graph freshness
-kanıtı değildir. Faz 6'da ayrı [incremental/freshness sözleşmesi](INCREMENTAL.md)
-eklenmiştir; context/export da `--check-freshness` ve `--require-fresh` kabul eder.
-`freshnessCheck` hash I/O maliyetini ve eksikleri bildirir.
+One buffer is decoded with BOM handling, then hashed as decoded text → UTF-8 →
+SHA-256, matching the source-evidence contract. A match yields snapshotMatched;
+a mismatch yields snapshotMismatch with text null. Other no-text states include
+missing, excludedByPolicy, outsideRoot, symlinkExcluded, generatedUnavailable,
+rootUnavailable, fileTooLarge, invalidLocation, and unreadable.
 
-Her snippet `trust: untrustedSourceData...` taşır. Yorumlar ve repository kaynaklı
-etiket/kanıtlar ajana verilen talimat değildir. CLI herhangi bir kaynağı uzak
-modele göndermez. Kullanıcı çıktıyı Copilot/başka ajana aktardığında yerel araçtan
-ayrı bir gizlilik sınırını kendisi geçer.
+A match proves only the buffer read at that moment, not global graph freshness or
+filesystem isolation. [INCREMENTAL](INCREMENTAL.md) defines check-freshness and
+require-fresh for all delivery formats. Each snippet carries an untrusted-source
+data marker. Comments, labels, and diagnostics are data, never agent instructions.
+The CLI sends nothing to a remote model; sharing output is a separate policy decision.
 
-## Export formatları
+## Formats
 
-- **JSON:** `{metadata, nodes, relationships}`. Metadata format sürümü, snapshot,
-  tam analysis context, coverage/limitations, stale, etkin limitler, kesilme ve
-  scope içerir. Node tam `RelationshipSymbol` ve varsa `GraphEntity`; relationship
-  tam `GraphRelationship`, occurrence listesi ve evidenceTruncated taşır.
-- **NDJSON:** İlk satır `{type:"metadata",data:...}`, sonra node, sonra relationship
-  satırları. Her satır bağımsız geçerli compact JSON'dur. JSON ile aynı veri.
-- **Mermaid / DOT:** Aynı NDJSON kayıtları sırasıyla `%% ` / `// ` tek satır
-  yorumlarında eksiksiz bulunur. Diyagramın kendisi okunabilir etiketli yönlü
-  ilişkileri gösterir. Böylece görsel formatta identity/evidence/context/eksikler
-  kaybolmaz; tüketici yorumları parse ederek asıl kayıtları alabilir.
-  Unresolved kayıt yorumda target null olarak kalır; sahte hedef çizilmez.
+- **JSON:** `{metadata, nodes, relationships}`. Metadata includes format version,
+  snapshot, full analysis context, coverage/limitations, freshness, effective bounds,
+  truncation, and scope. Nodes preserve RelationshipSymbol and optional GraphEntity;
+  edges preserve GraphRelationship, occurrences, and evidenceTruncated.
+- **NDJSON:** metadata record first, then nodes, then relationships; each line is
+  independently valid compact JSON and preserves the same information as JSON.
+- **Mermaid/DOT:** complete NDJSON records are retained in single-line `%%`/`//`
+  comments. The diagram shows labeled directed edges; null unresolved targets are
+  retained in comments without drawing invented target nodes.
 
-Tüm export node'ları ordinal ID, ilişkiler ordinal ID, occurrence'lar ordinal ID
-sırasındadır; SQLite insertion sırası çıktıyı değiştirmez. Diyagram node adları
-`n00000` gibi deterministik alias'lardır. Etiketler node ID yerine kullanılmaz.
-Mermaid özel karakterleri sayısal entity ile, DOT tırnak/backslash/satır sonlarını
-kaçışla yazar; Unicode korunur. JSON yorumları satır sonlarını escape eder.
-Tarayıcı, harici renderer, ağ veya yeni paket gerektirmez. Görsel renderer üzerinde
-piksel/sözdizimi kabulü bu oturumda yapılmadı; üretici escaping/Unicode/sıra ve
-kayıtların yorumlardan parse edilmesi otomatik testlerle doğrulandı.
+Diagram aliases such as n00000 are deterministic; labels do not become IDs.
+Mermaid special characters use numeric entities; DOT escapes quotes, backslashes,
+and newlines. JSON comments escape newlines and preserve Unicode. No browser,
+renderer, network access, or new dependency is required. Automated escaping/order/
+comment-parse checks are recorded; external renderer visual acceptance is NOT RUN.
 
-Tam export da sınırlandırılmıştır: `scope: fullGraph` tek başına her şeyin döndüğü
-anlamına gelmez; `truncated` ve reasons kontrol edilmelidir. Export byte/karakter
-bütçesi taahhüt etmez; node/ilişki/kanıt sınırları vardır. NDJSON çıktı formatıdır,
-uygulama içi sınırsız streaming bellek garantisi değildir.
+Even `scope: fullGraph` is bounded: inspect truncated/reasons. Export has record
+bounds, not a whole-output byte/character budget. NDJSON describes the output format,
+not a promise of unlimited internal streaming memory.
 
-## Tekrarlanabilir ölçüm
+## Reproducible example
 
 ```sh
-dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --trust-project --allow-generators --db .uographs/phase5-smoke.db
+dotnet run --project src/UO.Graphs.Cli --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --trust-project --allow-generators --db .uographs/phase5-smoke.db
 python3 scripts/phase5_smoke.py --db .uographs/phase5-smoke.db
 ```
 
-Script tam export'un kesilmediğini, entity/relationship/occurrence sayılarının
-status ile eşitliğini, context'in aynı snapshot'taki Welcome → Greet CALLS kanıtını
-koruduğunu ve tüm stdout karakter/byte boyutlarını ölçer. `measurement.json`, tam
-export, context ve dört seçili export `.uographs/phase5-evidence/` içine yazılır.
-Azalma `100 × (1 − contextChars/fullGraphChars)`; örnek görev/graph dışına genellenmez.
-Gerçek sayılar ve test komutları [STATUS](STATUS.md)'tadır.
-
-Faz 11 context karakter kırpması, seçili sembole yakın ilişkileri ve aynı
-uzaklıkta akış/framework ilişkilerini genel USES_TYPE/REFERENCES/DECLARES
-kayıtlarından önce tutar. Kırpma uncertainty/truncation zarfını korur.
-Export stdout içindir; dosyaya güvenli yazma için [SECURITY](SECURITY.md).
+The script verifies untruncated full export counts against status and retained
+Welcome → Greet evidence in context from the same snapshot. It measures complete
+stdout characters/bytes and writes measurement.json and outputs under
+`.uographs/phase5-evidence/`. Reduction is `100 × (1 − contextChars/fullGraphChars)`;
+that fixture/task measurement does not imply repository-wide or token savings.
+Historical values are in [Phase 5](history/PHASE5.md); current results are in
+[STATUS](STATUS.md). Use [safe export](SECURITY.md#export-and-skill-installation)
+when writing new files.

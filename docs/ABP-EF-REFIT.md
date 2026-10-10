@@ -1,131 +1,130 @@
-# Faz 9 — ABP, EF Core ve Refit
+# ABP, EF Core, and Refit analysis
 
-Bu üç modül bağımsız statik analiz kapsamıdır. Bir modülün olumlu testi diğerinin
-kabulü değildir. Gerçek komut/sonuçlar [STATUS](STATUS.md)'tadır. Kullanıcıya ait,
-erişilmeyen bir uygulama analiz edilmedi; `samples/Phase9` sentetik ama gerçek NuGet
-paketleriyle derlenen üç ayrı projedir. Host, DI container, DbContext, migration,
-veritabanı veya HTTP istemcisi çalıştırılmaz.
+These are three independent static-analysis modules. Passing one does not validate
+another. Fixtures under samples/Phase9 are synthetic projects compiled against real
+packages, not evidence from an inaccessible user application. Analysis starts no
+host, DI container, DbContext, migration, database, or HTTP client.
+[STATUS](STATUS.md) contains actual execution results.
 
-## Sabit sürümler ve API kanıtı
+## Pinned versions and API evidence
 
-| Modül | Derlenen paket/asset | Doğrulanan API | Lisans/kapsam |
+| Module | Package/asset | Verified API | License/scope |
 | --- | --- | --- | --- |
-| ABP | Volo.Abp.AspNetCore.Mvc ve ABP closure **10.1.1**, net10.0 | ApplicationService, IApplicationService, IRemoteService, AbpModule/DependsOn, Dependency/ExposeServices, IRepository ve temel interface'leri, AbpConventionalControllerOptions.Create | **LGPL-3.0-only**, yalnız paketlenmeyen fixture; ürün/test/runner bağımlılığı değil |
-| EF Core | Microsoft.EntityFrameworkCore.Relational/Core **10.0.5**, net10.0 | DbContext, DbSet, ModelBuilder.Entity, IEntityTypeConfiguration, ToTable/ToView, Property/HasColumnName | MIT, fixture |
-| Refit | **8.0.0**, net8.0 asset / net10.0 fixture | HttpMethodAttribute ve Get/Post/Put/Delete/Patch/Head/Options; RestService.For | MIT, fixture |
-| Platform | SDK **10.0.201**, runtime/ref pack **10.0.5**, Roslyn **5.0.0.0** | SemanticModel, IOperation, gerçek assembly/symbol binding | macOS ARM64 kabul ortamı |
+| ABP | Volo.Abp.AspNetCore.Mvc and closure **10.1.1**, net10.0 | ApplicationService/IApplicationService/IRemoteService, AbpModule/DependsOn, Dependency/ExposeServices, repository interfaces, AbpConventionalControllerOptions.Create | LGPL-3.0-only; isolated non-packable fixture, not product/test/runner dependency |
+| EF Core | Relational/Core **10.0.5**, net10.0 | DbContext/DbSet, ModelBuilder.Entity, IEntityTypeConfiguration, ToTable/ToView, Property/HasColumnName | MIT fixture |
+| Refit | **8.0.0**, net8.0 asset in net10.0 fixture | HttpMethodAttribute and Get/Post/Put/Delete/Patch/Head/Options; RestService.For | MIT fixture |
+| Recorded local platform | SDK **10.0.201**, runtime/reference pack **10.0.5**, Roslyn **5.0.0.0** | SemanticModel, IOperation, real assembly/symbol binding | macOS ARM64; later platform results in STATUS |
 
-Bu sürümler test edilen destek tabanıdır; başka sürümlerde aynı isimli API bulmak
-uyumluluk kabulü değildir. Her tanıma namespace + metadata name + metadata assembly
-kontrolü uygulanır; aynı isimli kaynak taklitleri framework sayılmaz. Snapshot proje
-bağlamını, Framework/HttpContract metadata'sı ilgili assembly identity'sini taşır;
-lock dosyaları tam dependency/content hash envanteridir.
+These exact versions are the tested baseline, not a promise about same-named APIs
+in other versions. Recognition checks namespace, metadata name, and metadata
+assembly; source lookalikes are not frameworks. Snapshot project context and
+Framework/HttpContract metadata retain assembly identity; locks retain complete
+dependency/content hashes.
 
-Birincil kaynaklar:
+Primary references:
 
-- [ABP 10.1.1 NuGet](https://www.nuget.org/packages/Volo.Abp.AspNetCore.Mvc/10.1.1),
-  nuspec kaynak commit'i `1ecba3756736acb90fc9c52340716530e001c7cd`.
-  [Controller seçimi](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.AspNetCore.Mvc/Volo/Abp/AspNetCore/Mvc/Conventions/ConventionalControllerSetting.cs),
-  [selector convention](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.AspNetCore.Mvc/Volo/Abp/AspNetCore/Mvc/Conventions/AbpServiceConvention.cs),
+- [ABP 10.1.1](https://www.nuget.org/packages/Volo.Abp.AspNetCore.Mvc/10.1.1), repository
+  commit `1ecba3756736acb90fc9c52340716530e001c7cd`:
+  [controller selection](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.AspNetCore.Mvc/Volo/Abp/AspNetCore/Mvc/Conventions/ConventionalControllerSetting.cs),
+  [selector conventions](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.AspNetCore.Mvc/Volo/Abp/AspNetCore/Mvc/Conventions/AbpServiceConvention.cs),
   [DI registrar](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.Core/Volo/Abp/DependencyInjection/ConventionalRegistrarBase.cs),
   [exposure](https://github.com/abpframework/abp/blob/1ecba3756736acb90fc9c52340716530e001c7cd/framework/src/Volo.Abp.Core/Volo/Abp/DependencyInjection/ExposedServiceExplorer.cs).
-- [EF Core ModelBuilder 10.0.5](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore/ModelBuilder.cs),
-  [relational mapping API](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore.Relational/Extensions/RelationalEntityTypeBuilderExtensions.ToTable.cs),
-  [table annotation convention](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore.Relational/Metadata/Conventions/RelationalTableAttributeConvention.cs).
-- [Refit 8 HTTP attributes](https://github.com/reactiveui/refit/blob/8.0.0/Refit/Attributes.cs),
-  [abstract interface method seçimi](https://github.com/reactiveui/refit/blob/8.0.0/Refit/RequestBuilderImplementation.cs),
-  [HTTP attribute seçimi](https://github.com/reactiveui/refit/blob/8.0.0/Refit/RestMethodInfo.cs).
+- EF Core 10.0.5 [ModelBuilder](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore/ModelBuilder.cs),
+  [relational mapping](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore.Relational/Extensions/RelationalEntityTypeBuilderExtensions.ToTable.cs),
+  [table annotations](https://github.com/dotnet/efcore/blob/v10.0.5/src/EFCore.Relational/Metadata/Conventions/RelationalTableAttributeConvention.cs).
+- Refit 8 [attributes](https://github.com/reactiveui/refit/blob/8.0.0/Refit/Attributes.cs),
+  [abstract interface selection](https://github.com/reactiveui/refit/blob/8.0.0/Refit/RequestBuilderImplementation.cs),
+  [HTTP attribute selection](https://github.com/reactiveui/refit/blob/8.0.0/Refit/RestMethodInfo.cs).
 
-ABP LGPL paketleri ürünün MIT bağımlılık kümesine eklenmedi. Audit yalnız
-`samples/Phase9/Abp/packages.lock.json` içinde ABP 10.1.1 istisnasına izin verir;
-başka closure'a sızması hatadır. NuGet binary'leri repository'ye kopyalanmaz.
-Fixture yeniden dağıtımı ayrıca LGPL koşullarına tabidir. NUglify BSD-2-Clause /
-Apache-2.0 ve MyCSharp bundled MIT ayrı doğrulandı; [envanter](DEPENDENCIES.md).
+ABP's LGPL packages are not relicensed MIT. The audit permits ABP 10.1.1 only in
+samples/Phase9/Abp/packages.lock.json and fails leakage into another closure.
+NuGet binaries are not checked in; fixture redistribution has separate LGPL
+obligations. NUglify BSD-2-Clause/Apache-2.0 and bundled MyCSharp MIT were separately
+verified. See [DEPENDENCIES](DEPENDENCIES.md).
 
-## ABP destek matrisi
+## ABP support matrix
 
-| Özellik | Durum | Çıktı ve sınır |
+| Feature | Status | Output and limit |
 | --- | --- | --- |
-| ApplicationService / IApplicationService-derived sözleşme | supported | Type üzerinde `Framework` rolü; `APP_SERVICE_CONTRACT` exact semantik interface bağı. Kalıtımdan endpoint çıkarılmaz. |
-| AbpModule / doğrudan DependsOn(typeof(...)) | supported | `MODULE_DEPENDS_ON` kaynak attribute kanıtıyla; module çalıştı demek değildir. |
-| IRepository<TEntity,TKey>, IRepository<TEntity>, inherited IBasic/IReadOnly repository | supported | Parameter/field/property/local/interface/invocation üzerinden `REPOSITORY_ENTITY`. Yalnız entity bağı; tablo/schema/context tahmini yok. |
-| Açık generic repository | partial | Hedef null, unresolved; generic substitution yapılmaz. Closed generic entity ayrıdır. |
-| DI marker, Dependency lifetime ctor, DisableConventionalRegistration, ExposeServices | partial | `registration` + inferred REGISTERS/IMPLEMENTED_BY. Default interface adı convention'ı uygulanır; her interface expose edilmez. |
-| ConventionalControllers.Create(typeof(T).Assembly) | partial | Aynı assembly'deki public, nongeneric, nonabstract IRemoteService sınıflarının doğrudan public instance metotları `endpointCandidate`; exposure ve HANDLED_BY inferred. Config ve method/type ayrı kaynak kanıtları saklanır. |
-| RemoteService false, inherited false, method false, NonAction/NonController | supported filtre | Type false'u method true açmaz. IsMetadataEnabled=false disable değildir. Interface attribute'u class'a kopyalanmaz. |
-| Static assembly config bulunmaması / runtime assembly değeri | unresolved | Conventional endpoint adayı üretilmez; dış konfigürasyon olabileceği tanıda açık kalır. Yokluk garantisi yok. |
-| URL conventions, RootPath, HTTP attribute/custom route override, TypePredicate | unresolved | Bu sürüm route/verb hesaplamaz; candidate RoutePattern/HttpMethod null. HTTP attribute varlığı tek başına kesin exposure sayılmaz. |
-| Custom/keyed exposure, scanning/callback/ReplaceServices, inherited action enumeration, external assembly config | unsupported | DI/runtime seçim veya route sonucu üretilmez; limitations ve partial tanıları korunur. |
+| ApplicationService / IApplicationService-derived contract | Supported | Framework type role; exact APP_SERVICE_CONTRACT interface binding, no inherited endpoint claim |
+| AbpModule / direct DependsOn(typeof(...)) | Supported | MODULE_DEPENDS_ON attribute evidence, not module execution |
+| IRepository<TEntity,TKey>/IRepository<TEntity>, inherited IBasic/IReadOnly contracts | Supported | REPOSITORY_ENTITY from parameters/fields/properties/locals/interfaces/calls; no table/schema/context guess |
+| Open generic repository | Partial | Null unresolved target; no substitution; closed entity contracts stay distinct |
+| DI markers, Dependency lifetime constructor, DisableConventionalRegistration, ExposeServices | Partial | Registration and inferred REGISTERS/IMPLEMENTED_BY; default interface-name convention, not every interface |
+| ConventionalControllers.Create(typeof(T).Assembly) | Partial | Direct public instance methods on eligible public nongeneric nonabstract IRemoteService classes in that assembly become endpointCandidate; inferred exposure/HANDLED_BY with separate config/type/method evidence |
+| RemoteService false, inherited false, method false, NonAction/NonController | Supported filters | Method true cannot override disabled type; IsMetadataEnabled=false is not exposure disable; interface attributes are not copied to classes |
+| No static assembly registration / runtime assembly value | Unresolved | No conventional endpoint candidate; external configuration remains possible |
+| URL conventions, RootPath, HTTP/custom route overrides, TypePredicate | Unresolved | No route/verb computation; RoutePattern/HttpMethod null; HTTP attribute alone does not prove exposure |
+| Custom/keyed exposure, scanning/callback/ReplaceServices, inherited actions, external assembly config | Unsupported | No runtime DI selection/route result; partial limitations retained |
 
-**Bilinen yanlış-pozitif riski:** TypePredicate, controller removal veya çalışmayan
-module declaration'ı candidate/DI adayını gerçekte devre dışı bırakabilir. Bu yüzden
-adaylar inferred ve `Activation=candidateOnly`, kesin endpoint değildir. Bağımsız
-explicit ASP.NET MVC selector'ları Faz 7 kurallarıyla ayrıca analiz edilir; ABP
-RemoteService convention filtresi bütün MVC route'larını silmez.
+False-positive boundary: TypePredicate, controller removal, or an unexecuted module
+can disable a source candidate. It remains inferred with `Activation=candidateOnly`.
+Independent explicit MVC selectors are analyzed by the ASP.NET extractor; ABP
+RemoteService conventions do not erase all MVC routes.
 
-ABP kabulü: `AbpContractsModulesAndGenericRepositoryUseRealPackageSymbols`,
-`AbpExposureOverridesMetadataAndConfigurationStaySeparate`,
-`AbpWithoutStaticAssemblyRegistrationNeverInventsEndpoint`,
-`AbpDiConventionsRespectLifetimeExposureAndDisableOverrides`, ABP compilation-error
-vakası ve `Phase9AbpRealPackagePersistsContractsRepositoriesAndInferredCandidates`.
+Acceptance tests include AbpContractsModulesAndGenericRepositoryUseRealPackageSymbols,
+AbpExposureOverridesMetadataAndConfigurationStaySeparate,
+AbpWithoutStaticAssemblyRegistrationNeverInventsEndpoint,
+AbpDiConventionsRespectLifetimeExposureAndDisableOverrides, compilation-error cases,
+and Phase9AbpRealPackagePersistsContractsRepositoriesAndInferredCandidates.
 
-## EF Core destek matrisi
+## EF Core support matrix
 
-| Özellik | Durum | Çıktı ve sınır |
+| Feature | Status | Output and limit |
 | --- | --- | --- |
-| DbContext kalıtımı, doğrudan DbSet<TEntity> property | supported | Context rolü; context/member → entity `CONTEXT_ENTITY`. Set adı tablo adı olmaz. |
-| ModelBuilder.Entity<T>() / Entity(typeof(T)) | supported | Bound entity declaration; runtime model üyeliği değildir. |
-| IEntityTypeConfiguration<TEntity> | supported | `CONFIGURES_ENTITY`; kullanılmayan configuration bir context'e bağlanmaz. |
-| [Table]/[Column], generic EntityTypeBuilder<T>.ToTable(name,schema)/ToView | supported bildirim | Ayrı `modelMapping` düğümleri; `MAPS_ENTITY` gerçek entity'ye bağlanır. Table/View ayrı alanlardır. Annotation/fluent override bildirimleri silinmez veya tek efektif modele birleştirilmez. |
-| Property(b => b.Property).HasColumnName(literal) | supported | Yalnız lambda parameter'ına doğrudan bağlı tek property. Captured/hesaplanan expression association unresolved. |
-| Runtime table/schema/column, koşullu mapping | partial | Literal bilinen alan tutulabilir; dinamik alan null, mapping confidence unresolved, koşul/eksik alan açıklanır. Entity bağı biliniyorsa exact kalabilir. |
-| ApplyConfiguration/ApplyConfigurationsFromAssembly, Ignore, owned/split/non-generic/string builders, custom model extensions | unsupported | Gözlenen gerçek model-builder API'leri ve model-builder parametreli custom wrapper çağrıları unresolved mapping kaydı/tanı üretir. Çağrı sırası/scanning/custom kod yürütülmez. ModelBuilder içermeyen opaque wrapper içi görülmüyorsa destek kapsamı dışında kalır. |
-| DbContext oluşturma, migration, provider conventions, efektif model, SQL/query plan, fiziksel tablo erişimi | unsupported | Hiçbiri çalıştırılmaz veya türetilmez. LINQ yalnız mevcut semantik CALLS/USES_TYPE kapsamında. |
+| DbContext inheritance and direct DbSet<TEntity> property | Supported | Context role and CONTEXT_ENTITY; set name is not table name |
+| ModelBuilder.Entity<T>() / Entity(typeof(T)) | Supported | Bound entity declaration, not effective model membership |
+| IEntityTypeConfiguration<TEntity> | Supported | CONFIGURES_ENTITY; unused configuration is not attached to a context |
+| Table/Column attributes, generic ToTable(name,schema)/ToView | Supported declarations | Separate modelMapping nodes and MAPS_ENTITY; table/view distinct; annotation/fluent declarations retained without resolving precedence |
+| Property(b => b.Property).HasColumnName(literal) | Supported | Direct lambda-parameter property only; captured/computed association unresolved |
+| Runtime names/schema/columns or conditional mapping | Partial | Known literals may survive; dynamic fields null and mapping unresolved; independently known entity link may stay exact |
+| ApplyConfiguration/assembly scanning, Ignore, owned/split/non-generic/string builders, custom extensions | Unsupported | Observed real builder APIs and custom calls with builder parameters produce unresolved mapping evidence/diagnostics; no execution/order/scanning. Invisible wrappers outside this surface remain out of scope |
+| Context creation, migrations, provider conventions, effective model, SQL/plans, physical tables | Unsupported | Never executed or derived; LINQ only has ordinary semantic evidence |
 
-**Bilinen yanlış-pozitif riski:** source mapping daha sonra override/Ignore edilebilir,
-çalışmayan configuration içinde bulunabilir. `Exact` yalnız o bildirimdeki sabit
-metadata ve entity association anlamındadır; efektif DB modeli değildir. Schema
-belirtilmediyse `dbo`/`public` varsayılmaz. `[Table]` görülmesi entity'nin context'e
-eklendiğini kanıtlamaz. EF repository bağı ABP modülünün gerçek generic argument
-kanıtından gelir; repository → belirli DbContext bağı uydurulmaz.
+False-positive boundary: later overrides/Ignore or unused configuration can make a
+source mapping ineffective. Exact means the declaration's constants/entity
+association only. No default dbo/public schema is assumed. Table attributes do not
+prove context membership; repository evidence does not invent a particular DbContext.
 
-EF kabulü: `EfContextDbSetsAndConfigurationContractsAreNotEffectiveModelClaims`,
-`EfExplicitMappingsPreserveAnnotationAndFluentOverrideDeclarations`,
-`EfRuntimeConfigurationScanningAndUnsupportedBuilderCannotBecomeExactMapping`,
-`EfComputedAndCapturedPropertyExpressionsAndRuntimeColumnAreUnresolved`, EF
-compilation-error vakası ve `Phase9EfRealPackagePersistsMappingsAndUnresolvedRuntimeConfiguration`.
+Acceptance includes EfContextDbSetsAndConfigurationContractsAreNotEffectiveModelClaims,
+EfExplicitMappingsPreserveAnnotationAndFluentOverrideDeclarations,
+EfRuntimeConfigurationScanningAndUnsupportedBuilderCannotBecomeExactMapping,
+EfComputedAndCapturedPropertyExpressionsAndRuntimeColumnAreUnresolved,
+compilation-error cases, and
+Phase9EfRealPackagePersistsMappingsAndUnresolvedRuntimeConfiguration.
 
-## Refit destek matrisi
+## Refit support matrix
 
-| Özellik | Durum | Çıktı ve sınır |
+| Feature | Status | Output and limit |
 | --- | --- | --- |
-| Gerçek built-in Get/Post/Put/Delete/Patch/Head/Options | supported | Abstract instance interface method → `HTTP_CONTRACT`; method/route template metadata exact. Bu düğüm server endpoint değildir. |
-| Call site → attributed interface method | supported | `INVOKES_HTTP` contract düğümüne; CALLS compile-time metoda bağlanmaya devam eder. |
-| Interface inheritance / new shadowing | supported | Bağlanan method symbol kullanılır; parent route child shadowing method'a kopyalanmaz. |
-| Aynı route, farklı contract/servis | supported ayırım | Kimlik project context + gerçek method identity + attribute içerir; aynı path tek servise indirgenmez. |
-| Custom HttpMethodAttribute subclass, birden fazla HTTP attribute | unresolved | Custom Path/Method kodu veya runtime first-attribute seçimi çalıştırılmaz; method/route null. |
-| Default interface body / static interface method | unsupported HTTP | Refit runtime abstract instance seçimine göre contract çıkarılmaz. Static HTTP attribute negatif testi gerçek DLL semantik compilation'ında, generator kapalıdır; Refit 8 generator bu şekle CS0539 üretir. Normal fixture generator açık derlenir. |
-| Base address, HttpClient mutation/settings, final URI substitution | unresolved | BaseAddress her zaman null; RestService.For gözlemi config tanısı üretir. Constant URL data flow da bu sürümün kapsamı dışındadır. |
-| Remote/local endpoint matching | unresolved | Her contract'tan null-target POSSIBLE_ENDPOINT. Salt route benzerliğiyle exact veya inferred local servis bağlantısı kurulmaz. |
-| Concrete generated client dispatch, generic closed-client substitution, custom serializers/auth handlers | unsupported | Interface sözleşmesi dışındaki runtime davranış genişletilmez. |
+| Built-in Get/Post/Put/Delete/Patch/Head/Options | Supported | Abstract instance interface method → HTTP_CONTRACT with static method/template; not server endpoint |
+| Call to attributed interface method | Supported | INVOKES_HTTP to client contract; CALLS remains on interface method |
+| Interface inheritance/new shadowing | Supported | Bound method identity; parent route not copied to child shadow |
+| Same route in distinct services/contracts | Supported distinction | Context + actual method + attribute identity; path alone never merges services |
+| Custom HTTP attribute / multiple HTTP attributes | Unresolved | No custom code or runtime first-attribute selection; method/route null |
+| Default interface body/static interface method | Unsupported HTTP | No contract under abstract-instance selection; static negative compiled against actual DLL with generators off because Refit 8 generator emits CS0539; normal fixture builds with generator |
+| Base address, HttpClient mutation/settings, URI substitution | Unresolved | BaseAddress null; RestService.For produces configuration diagnostic; even constant URL data flow is outside scope |
+| Remote/local endpoint matching | Unresolved | Null-target POSSIBLE_ENDPOINT per contract; matching route text never creates a service link |
+| Generated concrete client dispatch, closed generic-client substitution, serializers/auth handlers | Unsupported | No expansion beyond interface contract |
 
-**Bilinen yanlış-pozitif riski:** interface referansı farklı implementation alabilir,
-request hiç yürümeyebilir; route template gerçek request adresi değildir. Eşleşen
-local MVC route ve iki farklı Refit interface fixture'da birlikte bulunur; bağlantı
-hala unresolved kalır. Source generator varsayılan analizde çalıştırılmaz ve
-snapshot eksikliği açıkça raporlar.
+False-positive boundary: an interface can receive another implementation, and a
+request may never execute. Templates are not final request addresses. Fixtures
+include matching MVC routes and two Refit interfaces while remote targets remain
+unresolved. Default generator exclusion is visible in snapshot coverage.
 
-Refit kabulü: `RefitSamePathDifferentServicesStayDistinctAndCallsBindToContract`,
-`RefitRuntimeBaseAddressCustomAttributeAndNonAbstractMethodsRemainUnknown`,
-`RefitMultipleAndStaticHttpAttributesAreNotAssertedAsExecutableContracts`, Refit
-compilation-error vakası ve `Phase9RefitRealPackageKeepsSamePathServicesSeparateInContextAndExport`.
+Acceptance includes RefitSamePathDifferentServicesStayDistinctAndCallsBindToContract,
+RefitRuntimeBaseAddressCustomAttributeAndNonAbstractMethodsRemainUnknown,
+RefitMultipleAndStaticHttpAttributesAreNotAssertedAsExecutableContracts,
+compilation-error cases, and
+Phase9RefitRealPackageKeepsSamePathServicesSeparateInContextAndExport.
 
-## Saklama ve sorgu sözleşmesi
+## Persistence and traversal
 
-Ürün 0.9.0; JSON v4, SQLite schema 3, delivery v1 korunur. Optional `Framework`,
-`ModelMapping`, `HttpContract` metadata'sı mevcut JSON payload içinde atomik
-saklanır. Yeni ilişki yönleri Core `RelationshipContract` ve merkezi testte
-sabitlenmiştir. Dependencies/impact/path/context/export mevcut bütçe/güven
-kurallarını kullanır. Inferred traversal opt-in gerekir; unresolved null hedef
-üzerinden sahte yol kurulmaz. Her modülün framework tanıları snapshot'ı partial
-yapar; modüller birbirinin eksikliğini gizlemez.
+Product **0.9.0** retains JSON **4**, SQLite **3**, delivery **1**. Optional Framework,
+ModelMapping, and HttpContract metadata is atomically stored in existing JSON
+payloads. Nine additional relationship directions are fixed in RelationshipContract
+and its test. Dependencies/path/impact/context/export retain existing budgets and
+confidence rules. Query traversal through inferred edges needs opt-in; unresolved
+null targets never form invented paths. Framework uncertainty marks analysis partial.
+The initial Phase 9 integration failures are historical; later standard test passes
+are recorded in [STATUS](STATUS.md), not retroactively attributed to that phase run.

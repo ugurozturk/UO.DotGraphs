@@ -1,391 +1,417 @@
-# Gerçekleşen durum
+# Verified status
 
-Son güncelleme: **2026-10-10**.
+Last updated: **2026-10-10**.
 
-**Faz 11 sağlamlaştırması uygulandı; bütün release kabul kapıları kapatılmadı.**
-Tanımlı sürüm **UO.Graphs 0.9.0**, paket **UO.Graphs.Cli**, komut **uographs**.
-JSON envelope **4** / SQLite **3** / context-export **1** korunur.
-Yeni ürün analiz alanı, servis veya dependency eklenmedi.
-[Önceki faz](history/PHASE10.md), [release readiness ve kısa kullanım](RELEASE.md),
-[ölçümler](PERFORMANCE.md), [güven sınırı](SECURITY.md).
+**Phase 11 hardening is implemented; full release acceptance remains incomplete.**
+Product **UO.Graphs 0.9.0**, package **UO.Graphs.Cli**, command **uographs**.
+Query/index JSON **4**, SQLite **3**, context/export **1**, declaration identity **2**.
+No new product analysis domain, service, or runtime dependency was added by hardening.
+[Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
+and [previous phase](history/PHASE10.md) contain supporting details.
 
-## Ortak fixture SDK seçimi — 2026-10-10
+## Current acceptance snapshot
+
+This table supersedes older “not run” or “in progress” statements for the same
+checks below. Historical failures remain evidence of their original environments.
+
+| Check | Latest verified result |
+| --- | --- |
+| macOS ARM64 Release build | PASS, SDK 10.0.201; latest pre-documentation fixture-fix build 17.31 s, zero warnings/errors |
+| macOS standard VSTest | PASS **55/55 unit**, **99/99 integration**, zero skipped; integration 11m54s |
+| Linux CI at `5b52a01` | PASS **55/55 unit**, **99/99 integration**, zero skipped; Release build, audit, pack, installed-tool fresh index/query/context passed |
+| NuGet Trusted Publishing | PASS; verified 0.9.0 artifact pushed through OIDC on 2026-10-10 |
+| Local Release tool-path package smoke | PASS; isolated install/help/doctor/trust refusal/fresh index/query/context |
+| Temporary local manifest install/read smoke | PASS; its index NOT RUN in that historical invocation |
+| Global-scope installation | NOT RUN; user installation was not changed |
+| Windows / on-prem Azure execution | NOT RUN |
+| Physical offline / physical disk exhaustion | NOT RUN |
+| 1000-project analysis / peak process-tree RSS / true cache-cold measurement | NOT RUN |
+| Real VS Code/Copilot E2E | NOT RUN; file-format and CLI tests are separate |
+
+## English documentation refresh — 2026-10-10
+
+README and all Markdown under docs, including phase history, were reviewed against
+current code, settings, workflow definitions, and existing evidence. The generated
+DEPENDENCIES inventory was already English and remains unchanged so the license
+generator's --check continues to reproduce it. The other 28 documents were rewritten
+in English, preserving dated results, failures, and limitations. Existing uncommitted
+STATUS additions about the SDK fixture fix and CI were retained in English below.
+
+Corrected stale current-document claims include JSON/SQLite versions, tool packaging,
+query freshness flags, the complete framework dependency set, Linux CI status, and
+NuGet publication. Historical versions/counts are explicitly labeled as historical.
+No product code, tests, lock files, workflows, skills, or AGENTS were changed.
+Documentation-specific validation results are recorded at the end of this document.
+
+### Live CI and publication refresh
+
+Read-only GitHub inspection on 2026-10-10 verified
+[build-test-pack 37995066871](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37995066871)
+for commit `5b52a01f68003232e612c114bb709783b2338a0e`: **completed / success**.
+The Ubuntu 24.04 job completed at **2026-10-09 22:05:58 UTC**. Release build took
+**50.88 s**; tests passed **55/55** (18 s) and **99/99** (21m9s), zero skipped.
+License/release-tool checks, pack, package verification, isolated actual-package
+install and fresh index/query/context, and artifact upload all succeeded.
+This replaces the prior last-observed `in_progress` status; it does not validate Windows.
+
+[Publish 37997326843](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37997326843)
+for the same source commit completed successfully. Logs confirmed artifact identity/
+commit/hash verification, successful OIDC token exchange, and an actual package push
+at **2026-10-10 06:21:31 UTC**, not a duplicate-version skip. Published nupkg SHA-256:
+`f800123c914e32fb5f2827c789350966fae885171c5ef87093e1976875548afb`.
+The documentation agent inspected existing runs; it did not trigger CI or publish.
+
+Read-only commands used:
+
+```sh
+gh run view 37995066871 --repo ugurozturk/UO.DotGraphs --json status,conclusion,headSha,jobs,url
+gh run view 37995066871 --repo ugurozturk/UO.DotGraphs --log
+gh run list --repo ugurozturk/UO.DotGraphs --workflow publish-nuget.yml --limit 3 --json databaseId,status,conclusion,headSha,url
+gh run view 37997326843 --repo ugurozturk/UO.DotGraphs --log
+```
+
+## Shared fixture SDK selection — 2026-10-10
 
 [Linux CI 37991790585](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37991790585)
-unit **55/55 PASS**, integration **94 PASS / 4 FAIL** verdi. Tam log'da
-freshness hatasının sonunda `SDK outside the validated base-SDK dependency model`
-tanısı da bulunuyor. Generator dışındaki üç hata aynı fingerprint eksikliğini
-gösteriyor: `Complete` false, `--require-fresh` unknown reddi ve noOp yerine rebuild.
+had **55/55 unit PASS**, **94 integration PASS / 4 FAIL**. Full logs included
+`SDK outside the validated base-SDK dependency model`. Besides generator startup,
+three Phase6 failures shared an incomplete fingerprint: Complete false,
+require-fresh rejecting unknown, and rebuilding instead of no-op.
 
-`CopyFixture` yalnız `samples/Phase2` altını geçici dizine kopyalıyordu; repo
-kökündeki `global.json` kapsam dışında kalıyordu. Birden çok SDK bulunan runner'da
-geçici proje için yapılan SDK seçimi repo pin'inden ayrılabiliyordu. Ortak yardımcı
-artık repo `global.json` dosyasını fixture köküne de kopyalar. Önceki generator
-düzeltmesindeki pin korunur. Ürünün bilinmeyen dependency durumunda reuse'u kapatan
-kontrolü, freshness beklentileri veya timeout sınırları değiştirilmedi.
+The generator-fix commit `1bc8e5e` was then inspected read-only in
+[CI 37994084225](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37994084225):
+**55/55 unit PASS**, **95 integration PASS / 3 FAIL**, 8m9s. Generator cancellation
+passed; the three Phase6 failures remained. That run did not contain the shared
+CopyFixture SDK fix.
 
-Yeni `CopiedFixtureSelectsRepositorySdkOutsideCheckout` regresyonu, geçici üst
-dizinde çakışan `99.0.100` SDK talebi oluşturarak gerçek `dotnet --version` seçimini
-sınar. Böylece yalnız tek SDK kurulu geliştirme makinesinde de eksik pin yakalanır.
-Test düzeltme öncesinde **FAIL**: SDK resolver üst dizindeki `99.0.100` talebini
-seçti (`sdk-selection-red.trx`). İlk test yazımındaki eksik temporary directory
-hazırlığı ayrıca düzeltildi; o ilk failure SDK regresyonunun kanıtı sayılmaz.
-Phase6 Complete assertion'ları artık fingerprint limitation nedenlerini gösterir;
-incremental oracle'a ilk snapshot için Complete assertion'ı da eklendi.
+CopyFixture previously copied only samples/Phase2 into a temporary directory,
+leaving repository global.json behind. On multi-SDK runners, the temporary target
+could resolve a different SDK. The helper now copies the repository pin to the
+fixture root, preserving the generator fixture's earlier pin. Product dependency
+completeness checks, freshness expectations, and timeout bounds were not weakened.
 
-Yerel macOS ARM64 / SDK 10.0.201 kayıtları `.uographs/ci-sdk-fixture-fix/` altında:
+`CopiedFixtureSelectsRepositorySdkOutsideCheckout` creates a conflicting **99.0.100**
+SDK request in a temporary parent and checks actual dotnet --version selection.
+The regression failed before the fix (`sdk-selection-red.trx`) because resolution
+used the parent request. An earlier test-authoring failure due to missing temporary
+directory setup was corrected and is not counted as regression evidence. Phase6
+Complete assertions now show limitation reasons; the mutation oracle also asserts
+initial snapshot completeness.
 
-- `dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`:
-  **PASS**, 17.31 sn, 0 warning / 0 error.
-- `dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit.trx' --results-directory .uographs/ci-sdk-fixture-fix`:
-  **PASS 55/55**, skipped 0, 6 sn.
-- Kullanıcının açık onayıyla `dotnet msbuild samples/HelloGraph/HelloGraph.Domain/HelloGraph.Domain.csproj -nologo -getProperty:MSBuildToolsPath,MSBuildExtensionsPath,MSBuildSDKsPath`:
-  **PASS**; tools/extensions `/usr/local/share/dotnet/sdk/10.0.201`, SDKs aynı
-  dizinin `Sdks` altı. Restore/build hedefi verilmedi; bu macOS gözlemidir.
+Recorded local macOS ARM64 / SDK 10.0.201 evidence: `.uographs/ci-sdk-fixture-fix/`.
 
-Son ortak-fixture düzeltmesinin Linux/Windows ve GitHub CI doğrulaması **NOT RUN**.
-Yeni dependency/restore, commit/push/publish yok. Değişen dosyalar:
-`Phase2Tests.cs`, `Phase6Tests.cs`, `docs/STATUS.md`.
-Önerilen commit: `fix(tests): preserve pinned SDK in copied integration fixtures`
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit.trx' --results-directory .uographs/ci-sdk-fixture-fix
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'console;verbosity=normal' --logger 'trx;LogFileName=integration.trx' --results-directory .uographs/ci-sdk-fixture-fix
+dotnet msbuild samples/HelloGraph/HelloGraph.Domain/HelloGraph.Domain.csproj -nologo -getProperty:MSBuildToolsPath,MSBuildExtensionsPath,MSBuildSDKsPath
+```
 
-## Generator cancellation CI testi — 2026-10-10
+- Build PASS **17.31 s**, zero warnings/errors.
+- Unit PASS **55/55**, zero skipped, **6 s**.
+- Integration PASS **99/99**, zero skipped, **11m54s**. New SDK regression and all
+  four originally failing cases passed. Mutation oracle **5m2s**, implicit import
+  **21 s**, freshness **31 s**, generator cancellation **3 s**. Includes actual CLI
+  index/separate-process query; no build/pack overlapped the suite. The extra test
+  accounts for the count increasing from 98 to 99.
+- The explicit user-authorized MSBuild property query passed without restore/build
+  targets: tools/extensions `/usr/local/share/dotnet/sdk/10.0.201`, SDKs beneath its
+  Sdks directory. This was a macOS observation.
+- `git diff --check`: PASS.
 
-Paylaşılan Linux CI çıktısında unit **55/55 PASS**; integration generator testi
-başlangıç marker'ını 90 saniyede göremedi. Bu çıktı generator cancellation'ının
-başarısız olduğunu değil, cancellation assertion'ına ulaşılamadığını gösterir.
-Eski test macOS ARM64 üzerinde normal, `DOTNET_PROCESSOR_COUNT=2` ve `=1`
-koşullarında ayrı ayrı **1/1 PASS**; Linux timeout'u yerelde yeniden üretilmedi.
+During tests, commit `5b52a01` appeared in the working tree and retained the test
+fixes; the agent did not commit/push/publish. Final results were added to uncommitted
+STATUS. Linux was last observed in progress then; the completed result is above.
+Windows remains NOT RUN. No new dependency/restore.
+Changed: Phase2Tests.cs, Phase6Tests.cs, STATUS.
+Suggested commit: `fix(tests): preserve pinned SDK in copied integration fixtures`
 
-`Phase11GeneratorCancellationTests.cs` içindeki test düzeni sağlamlaştırıldı:
+## Generator cancellation CI test — 2026-10-10
 
-- In-process index testi, process-wide MSBuild ortamını değiştiren CLI testleriyle
-  çakışmaması için paralel çalışmayan ayrı xUnit collection'a alındı.
-- Repo dışında oluşturulan fixture'a repo `global.json` dosyası kopyalanır;
-  runner'ın en yeni SDK'sının örtük seçilmesi önlenir.
-- Senkron generator ve marker/cancel bekleyişi xUnit synchronization context'ini
-  paylaşmaz; gerçek `IncrementalIndexer.RunAsync` ayrı task'ta çalışır.
-- Ürün ilerleme satırları süreleriyle test çıktısına ve timeout mesajına eklenir.
-  90 saniyelik başlangıç, 10 saniyelik cancellation, 20 saniyelik cleanup sınırları
-  ve token/observed/exception assertion'ları korunur. Ürün kodu değişmedi.
+The earlier Linux output had 55/55 unit passing, but the integration test never saw
+the generator-start marker within 90 s. It did not reach cancellation assertions,
+so this was not evidence that cancellation itself failed. The old test passed
+locally in normal, DOTNET_PROCESSOR_COUNT=2, and =1 runs, 1/1 each; Linux timeout
+was not locally reproduced.
 
-Doğrulama kayıtları `.uographs/generator-ci-fix/` altında. Release build:
-`dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`
-**PASS**, 23.65 sn, 0 warning / 0 error.
+The test was moved to a nonparallel xUnit collection to avoid process-wide MSBuild
+state collisions, copied global.json outside the checkout, ran the real indexer
+on a separate task from xUnit's synchronization context, and added timed progress
+to output/timeouts. The 90 s start, 10 s cancellation, 20 s cleanup bounds and
+all token/observation/exception assertions stayed intact. Product code did not change.
 
-Odaklı test komutları (macOS ARM64, SDK 10.0.201):
+Evidence: `.uographs/generator-ci-fix/`. Release build with the same flags above
+passed **23.65 s**, zero warnings/errors.
 
 ```sh
 DOTNET_PROCESSOR_COUNT=2 dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Phase11GeneratorCancellationTests|FullyQualifiedName~GeneratorsNeedPermissionAndGeneratedPolicyDoesNotRunDiagnosticAnalyzers|FullyQualifiedName~NewlyCreatedImplicitUserImportIsStaleAndRebindsCompilation|FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses' --logger 'console;verbosity=normal' --logger 'trx;LogFileName=focused.trx' --results-directory .uographs/generator-ci-fix
 DOTNET_PROCESSOR_COUNT=1 dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~Phase11GeneratorCancellationTests --logger 'console;verbosity=normal' --logger 'trx;LogFileName=single-cpu.trx' --results-directory .uographs/generator-ci-fix
 ```
 
-- İki işlemci koşulu: **PASS 4/4**, skipped 0, toplam 69.88 sn; generator **3.749 sn**.
-  Gerçek CLI HelloGraph index ve ayrı proseslerde query/status smoke dahil.
-  Aynı koşuda generator izin politikası ve geçici MSBuild user import testi geçti.
-- Tek işlemci koşulu: **PASS 1/1**, skipped 0, toplam 6.07 sn.
-- `focused.trx` içindeki generator çıktısında fingerprint/invalidation ve workspace
-  loading satırlarının süreleri bulunduğu ayrıca kontrol edildi.
-- `git diff --check`: **PASS**.
+Two-CPU: **4/4 PASS**, zero skipped, **69.88 s**, generator **3.749 s**; includes real
+HelloGraph index/query/status, permission policy, and implicit user import. One-CPU:
+**1/1 PASS**, zero skipped, **6.07 s**. TRX contained timed fingerprint/invalidation/
+workspace progress. Diff check passed. Full suite/Linux were not rerun during that
+specific change; later results above supersede that historical gap. No dependency,
+restore, or agent commit/push/publish. Changed Phase11GeneratorCancellationTests and
+STATUS. Suggested commit:
+`fix(tests): isolate generator cancellation acceptance from runner state`
 
-Linux/GitHub tekrar koşusu **NOT RUN**; bu değişiklik Linux kök nedeninin
-doğrulandığı veya CI kabulünün kapandığı anlamına gelmez. Tam .NET suite tekrar
-koşulmadı; yukarıdaki odaklı testler ilgili davranışları kapsar.
-Yeni bağımlılık, restore, commit/push/publish yok.
-Değişen dosyalar: integration `Phase11GeneratorCancellationTests.cs`, `docs/STATUS.md`.
-Önerilen commit: `fix(tests): isolate generator cancellation acceptance from runner state`
+## GitHub/NuGet automation and exact version — 2026-10-09
 
-## GitHub/NuGet yayın otomasyonu — 2026-10-09
+User-requested workflows added build/test/pack and NuGet Trusted Publishing under
+uozturk. Main-push success publishes the exact verified artifact; PR/manual CI does
+not. No permanent API key. Policy/release instructions are in [RELEASE](RELEASE.md).
+Live OIDC/publication was NOT RUN during implementation; later success is above.
 
-Kullanıcının isteğiyle GitHub Actions build/test/pack ve NuGet Trusted Publishing
-eklendi. `main` push başarılıysa `uozturk` hesabıyla otomatik yayınlanacak;
-PR ve manuel CI publish yapmaz. Kalıcı API key yok. NuGet policy alanları ve
-kurulum/yayın adımları [RELEASE](RELEASE.md#github-actions-ve-nuget-trusted-publishing)
-ve [README](../README.md)'dedir. Canlı GitHub/OIDC/NuGet çalıştırması **NOT RUN**;
-workflow oluşturulması NuGet policy'nin oluşturulduğu veya paketin yayımlandığı
-anlamına gelmez. Commit/push/publish yapılmadı.
+CI uses Ubuntu 24.04, pinned SDK, locked restore, Release VSTest, license checks, and
+fresh installed-package smoke. Publishing verifies run ID/package/version/commit/
+SHA-256 without rebuilding. Upload scope is nupkg/manifest/TRX, not raw graphs.
+Version is exactly Directory.Build.props `<Version>0.9.0</Version>`; no run-number
+suffix. Help and new graph toolVersion read assembly version. Tests select CLI and
+contract fixture binaries from their own build configuration; target analysis still
+defaults to Debug. The generator fixture's explicit Debug reference is built separately.
 
-- `ci.yml`: Ubuntu 24.04, sabit SDK, locked restore, Release build ve standart
-  VSTest, lisans kontrolü, pack ve yerel feed'den kurulan gerçek tool smoke.
-- `publish-nuget.yml`: yalnız ilk taraf başarılı main push CI'ın run-id'sindeki
-  artifact; kimlik/sürüm/commit/SHA-256 tekrar kontrolü; yeniden derleme yok.
-- Kullanıcının düzeltmesiyle sürüm doğrudan `Directory.Build.props` içindeki
-  `<Version>` değeridir; CI çalıştırma numarası eklenmez. Aynı sürüm restore/build/
-  test/pack boyunca korunur. CLI help ve yeni graph `toolVersion` assembly sürümünü okur.
-- Test harness'ler CLI ve contract fixture DLL'lerini test assembly'sinin gerçek
-  Debug/Release yapılandırmasından seçer. Analiz edilen hedefin varsayılan Debug
-  bağlamı değişmedi. Generator fixture referansı açıkça Debug olduğundan CI onu
-  ayrıca Debug derler. Assertion veya test kaldırılmadı.
-- Upload kapsamı nupkg, manifest ve TRX; graph/ham context/yerel evidence yok.
-  Ürün dependency'si, runtime upload/restore veya yeni analiz alanı eklenmedi.
+### Exact-version validation
 
-### Sabit sürüm düzeltmesinin doğrulaması
+Local macOS ARM64 evidence: `.uographs/static-version/`.
 
-`Directory.Build.props` değiştirilmedi; mevcut `<Version>0.9.0</Version>` aynen
-kullanılır. CI ve publish workflow'larından run-number girdisi kaldırıldı.
-Yeni sürüm için kullanıcı Version değerini elle değiştirir; aynı sürüm NuGet'te
-varsa `--skip-duplicate` ile atlanır. README ve RELEASE buna göre güncellendi.
-
-Yerel macOS ARM64 kontrolleri, `.uographs/static-version/`:
-
-- `python3 -B scripts/test_ci_package.py`: **PASS 9/9**; farklı CI run değerlerinde
-  props sürümünün aynen korunduğu ve eksik/geçersiz sürümün reddedildiği dahil.
-- `python3 -B scripts/verify_ci_package.py --print-version`: **0.9.0**.
-- `dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false`:
-  **PASS 21.93 sn**, 0 warning / 0 error; Version override verilmedi.
-- `dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/static-version/packages`:
-  **PASS**, `UO.Graphs.Cli.0.9.0.nupkg`.
-- Paket doğrulayıcı `--version 0.9.0 --commit <HEAD> --write-manifest` ve
-  `--verify-manifest`: **PASS**, SHA-256
-  `5d236ea8e24d83f13480d5dc39e2aface9cbf35fa93c3d8391285f9de643aa3a`.
-- `python3 -B scripts/smoke_package.py .uographs/static-version/packages --version 0.9.0 --evidence .uographs/static-version/smoke`:
-  **PASS**, izole yerel install/help/doctor/trust reddi, yeni DB üzerinde
-  index **8.357 sn / 15 entity**, query/context; help ve graph sürümü **0.9.0**.
-- İki workflow YAML parse ve 11 shell bloğunda `bash -n`; `git diff --check`: **PASS**.
-  Ürün C# kodu değişmediğinden tam .NET suite bu düzeltmede yeniden çalıştırılmadı.
-  GitHub/OIDC/NuGet canlı yayın **NOT RUN**; commit/push/publish yapılmadı.
-
-Bu düzeltmede değişen dosyalar: `ci.yml`, `publish-nuget.yml`,
-`verify_ci_package.py`, `test_ci_package.py`, README, RELEASE ve STATUS.
-Önerilen commit: `fix(ci): use the exact version from Directory.Build.props`
-
-### Önceki yayın otomasyonu kontrolleri
-
-Aşağıdaki 0.9.1 sürümü önceki yerel denemelerde açık komut parametresiyle verildi;
-güncel sürüm kaynağı yukarıdaki props değeridir.
-Yerel doğrulama (macOS ARM64), `.uographs/trusted-publishing/`:
-
-| Komut/kontrol | Sonuç |
+| Check | Result |
 | --- | --- |
-| `dotnet build UO.Graphs.slnx -c Release --no-restore -p:Version=0.9.1 -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, 0 warning / 0 error, ilk build 22.70 sn. |
-| `dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -p:Version=0.9.1 -m:1 -nr:false --logger 'trx;LogFileName=release-unit.trx' --results-directory .uographs/trusted-publishing/vstest` | PASS 55/55, skipped 0, 6 sn. |
-| `dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -p:Version=0.9.1 -m:1 -nr:false --logger 'trx;LogFileName=release-integration.trx' --results-directory .uographs/trusted-publishing/vstest` | PASS 98/98, skipped 0, 11m23s. Son sürüm çıktısı düzeltmesinden önceki binary; bu sırada rebuild/pack yapılmadı. |
-| `dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:Version=0.9.1 -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/trusted-publishing/packages` | PASS, 218 entry; yerel 0.9.1 deneme paketi. |
-| `verify_ci_package.py ... --version 0.9.1 --commit <HEAD> --write-manifest`, ardından `--verify-manifest` | PASS: paket kimliği/sürümü, MIT, repository commit, CLI/BuildHost/native SQLite payload, fixture dışlama ve SHA-256. |
-| `python3 scripts/smoke_package.py .uographs/trusted-publishing/packages --version 0.9.1 --evidence .uographs/trusted-publishing/smoke` | İlk paket PASS: install/help/doctor, trust exit 3, yeni DB'de index 15 entity, query/context. Index 10.070 sn. Son sürüm çıktısı düzeltmesi sonrası tekrar aşağıdadır. |
-| `python3 scripts/test_ci_package.py` / `python3 scripts/test_release_tools.py` | PASS 8/8 / 2/2. Sentetik paket negatifleri gerçek kurulumun yerine kullanılmadı. |
-| `python3 scripts/audit_licenses.py --check` | PASS 143 kilitli paket; mevcut lisans kapanımları korunur. |
-| Temiz kaynak kopyasında CI'ın üç restore hedefi, `--locked-mode -p:Version=0.9.1 -p:NuGetAudit=false -m:1 -nr:false` | PASS; solution, Phase2 fixtures ve Phase3. Yerel cache kontrolü; canlı NuGet vulnerability audit iddiası değil. CI audit'i kapatmaz. |
-| YAML parse, 11 workflow shell bloğunda `bash -n`, Python AST, `git diff --check` | PASS. GitHub Actions runtime veya OIDC kabulü değildir. |
+| `python3 -B scripts/test_ci_package.py` | PASS **9/9**, exact props version across CI-run values and invalid-version rejection |
+| `python3 -B scripts/verify_ci_package.py --print-version` | **0.9.0** |
+| Release build, same command above without Version override | PASS **21.93 s**, zero warnings/errors |
+| `dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false --output .uographs/static-version/packages` | PASS, UO.Graphs.Cli.0.9.0.nupkg |
+| Verifier --version 0.9.0 --commit HEAD, write/verify manifest | PASS; SHA-256 `5d236ea8e24d83f13480d5dc39e2aface9cbf35fa93c3d8391285f9de643aa3a` |
+| `python3 -B scripts/smoke_package.py .uographs/static-version/packages --version 0.9.0 --evidence .uographs/static-version/smoke` | PASS; isolated install/help/doctor/trust refusal, fresh index **8.357 s / 15 entities**, query/context; help/graph version 0.9.0 |
+| Two YAML parses, 11 shell blocks with bash -n, git diff --check | PASS |
 
-Son sürüm çıktısı değişikliği sonrası, önceki tam suite tamamlandıktan sonra:
+Full .NET suite was not repeated for this version-only workflow correction. New
+versions require manually changing props; duplicates are skipped. Changed workflows,
+verifier/package tests, README/RELEASE/STATUS. Suggested commit:
+`fix(ci): use the exact version from Directory.Build.props`
 
-| Takip kontrolü | Sonuç |
+### Earlier local 0.9.1 experiments
+
+**0.9.1 was an explicit local test override, not the configured/published version.**
+Evidence: `.uographs/trusted-publishing/`. Build/test/pack used `-p:Version=0.9.1`.
+
+| Check | Result |
 | --- | --- |
-| Aynı Release build komutu, son kaynaklar | PASS 8.89 sn, 0 warning / 0 error. |
-| Aynı unit komutu, `final-unit.trx` | PASS 55/55, skipped 0, 7 sn. |
-| Aynı integration komutu; `--filter 'FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses\|FullyQualifiedName~HelpAndDoctorRunWithoutLoadingTarget'`, `final-version-cli.trx` | PASS 2/2, skipped 0, 12 sn; help ve graph sürüm assertion'ları dahil. Tam 98 test son sürüm metni değişikliğinden sonra yeniden çalıştırılmadı. |
-| Aynı pack/verifier komutları, çıktı `final-packages/` | PASS; final manifest SHA-256 `b7c0a48c27fc393af532c31f965791ad19f0b68c6c8e8cfc40683cf95d528f24`. |
-| `python3 scripts/smoke_package.py .uographs/trusted-publishing/final-packages --version 0.9.1 --evidence .uographs/trusted-publishing/final-smoke` | PASS: yerel-only install 0.791 sn; help/graph sürümü 0.9.1; trust reddi; sıfırdan index 8.593 sn / 15 entity; ayrı query/context prosesleri. |
-| Son lisans/diff/yerel Markdown link kontrolü | PASS; 143 paket, eksik yerel link yok. |
+| Release build | PASS **22.70 s**, zero warnings/errors |
+| Standard Release unit | PASS **55/55**, zero skipped, **6 s** |
+| Standard Release integration before final version-output fix | PASS **98/98**, zero skipped, **11m23s**; no concurrent build/pack |
+| Pack | PASS, **218 entries**, local 0.9.1 package |
+| Manifest/identity/MIT/commit/payload/exclusion verifier | PASS |
+| First actual-package smoke | PASS; install/help/doctor/trust exit 3/fresh index **10.070 s / 15 entities**/query/context |
+| test_ci_package / test_release_tools | PASS **8/8 / 2/2**; synthetic negatives not substitutes for installation |
+| License audit | PASS **143** |
+| Three CI restore targets in clean source copy, locked mode and NuGetAudit=false | PASS using local cache, not live vulnerability audit; CI does not disable audit |
+| YAML/11 shell blocks/Python AST/diff | PASS, not live OIDC evidence |
 
-Test deneme paketi, henüz commit edilmemiş çalışma ağacından üretildi; yerel
-nuspec commit alanı mevcut HEAD'i gösterir, bu bir yayımlanmış commit/paket değildir.
-GitHub CI temiz checkout'un commit'ini ve aynı çalışmanın paketini doğrular.
-Eski Faz 11 IPC başarısızlıkları aşağıda tarihsel kanıt olarak korunur; bu tur
-izinli yerel koşulda kurulu tool index'i geçti. Linux CI, Windows, fiziksel offline
-ve gerçek NuGet yayın kapıları bu yerel başarıdan çıkarılmaz.
+After the final version-output source fix and completion of the full suite:
+Release build **8.89 s**; unit **55/55** in **7 s**; focused real-index/help-doctor
+integration **2/2** in **12 s**, including version assertions. The entire 98-case
+suite was not repeated after that final string change. Final package manifest
+SHA-256 `b7c0a48c27fc393af532c31f965791ad19f0b68c6c8e8cfc40683cf95d528f24`.
+Final local-feed install **0.791 s**, fresh index **8.593 s / 15 entities**, help/graph
+0.9.1, separate query/context all passed. License/diff/local links passed.
 
-Değişen dosyalar: iki `.github/workflows` dosyası; `verify_ci_package.py`,
-`smoke_package.py`, `test_ci_package.py`; CLI csproj/Program, Core/ProductVersion,
-Roslyn/ProjectIndexer; integration CliTests/Phase6Tests ve unit MessagingTests;
-README, RELEASE, STATUS, DEPENDENCIES ve lisans envanteri scriptinin başlık metni.
-Önerilen commit: `ci: publish verified UO.Graphs tool packages with NuGet trusted publishing`
+These packages came from a then-uncommitted tree; the nuspec commit was HEAD, not
+proof of a published commit/package. CI later verified a clean checkout/artifact.
+Changed workflows, verify/smoke/test_ci_package, CLI metadata/Program,
+Core ProductVersion, Roslyn indexer, CLI/Phase6/Messaging tests and release documents.
+Suggested commit:
+`ci: publish verified UO.Graphs tool packages with NuGet trusted publishing`
 
-## Değişiklikler ve somut kanıt
+## Phase 11 hardening and performance evidence
 
-- Parametrik sentetik solution üreticisi: 10/100/1000 proje, sınıf/method boyutu,
-  star project dependency topolojisi. Üç dataset üretildi; 10 ve 100 gerçek analiz
-  edildi. 1000 index **NOT RUN**; üretim analiz başarısı sayılmadı.
-- Ölçülmüş repeated-solution-load maliyeti için aynı TFM, generator kapalı
-  solution'da bir workspace ve analyzer-free immutable Solution paylaşılır.
-  Karışık TFM/generator/project input yolu ayrı kalır. Initial shared-workspace
-  load başarısızsa aynı hatayı N proje için yeniden beklemeden exit 5 verilir.
-- Aynı kaynağın farklı reference bağlamları artık aliases/EmbedInteropTypes,
-  PE module MVID ve recursive compilation referanslarıyla ayrılır. Yanlış exact
-  bağlam birleşimine karşı unit regresyonu eklendi.
-- Context bütçesinde seçili sembole yakın akış/framework ve uncertainty kanıtı
-  uzak generic ilişkilerden önce korunur. Önceki Refit 50.000 karakter testi
-  assertion veya bütçe gevşetilmeden geçti.
-- `ProjectPreparation` dotnet/MSBuild subprocess stdout/stderr'ı sınırlı;
-  timeout/cancellation parent exit sonrası pipe
-  drain'i de kapsar. Gerçek parent/child, post-exit pipe handshake ve büyük stderr
-  regresyonları geçti. Gerçek index yolundaki kooperatif generator token'ı alıp
-  cancellation'ı gözlemledi; token'ı yok sayan generator için zorla durdurma iddiası yok.
-- SQLite FULL rollback/retry, bozuk config/non-DB, sidecar symlink reddi testleri;
-  gerçek SIGINT/SIGKILL/concurrent-writer scripti. Export için exclusive helper.
-- Tool paket metadata'sı, yerel nupkg feed ve izole temporary tool-path kurulum.
-  MIT/third-party metinleri, SDK/offline hazırlık, self-hosted Azure örneği;
-  standalone Python doğrulama scriptleri. Ayrı geçici local manifest kurulum/read
-  smoke da geçti; kullanıcının global tool/manifest'i değiştirilmedi.
-- README/help/schema/skill komutları sürüm 0.9.0 sözleşmesiyle uyumlu.
-  Schema üst zarf içindir, iç graph metadata'sı genişletilebilir. Skill/template
-  parity ve gerçek read akışı geçti; Copilot model E2E hâlâ **NOT RUN**.
+Implemented a controlled 10/100/1000-project generator; measured 10 and 100, but
+1000 analysis NOT RUN. Same-TFM, diagnostic-free, generator-disabled solutions share
+one workspace/analyzer-free immutable Solution. Other load paths remain separate;
+initial shared-load failure is not retried for every project. Reference context
+comparison now includes aliases/EmbedInteropTypes, module MVID, and recursive
+compilation references. No selective project/method incremental reuse.
 
-## Performans — ölçüm kapsamı
+Context pruning favors nearby flow/framework evidence and retains uncertainty;
+Refit's 50,000-character regression passed without relaxing its budget/assertions.
+Preparation subprocess output/timeouts cover pipe drain after parent exit. Real
+parent/child and cooperative-generator cancellation tests, SQLITE_FULL rollback,
+corrupt config/non-DB, sidecar symlinks, SIGINT/SIGKILL/contention, and exclusive
+export helpers were added. Tool packaging includes licenses and standalone scripts;
+the self-hosted Azure example adds no hosted service. Skill/template parity and
+real reads passed; Copilot E2E remains NOT RUN.
 
-macOS **27.0.1 ARM64**, **24 logical CPU / 64 GiB RAM**, SDK **10.0.201**,
-runtime **10.0.5**. CPU model sysctl/proses listesi ps izinleri yok.
-Raw kayıtlar `.uographs/phase11-evidence/` altında; donanım/SDK, boyut,
-önceden kaydedilmiş bütçeler, gerçek argv/stdout/stderr ve tekrar sayıları korunur.
+Measurements used macOS **27.0.1 ARM64**, **24 logical CPUs / 64 GiB RAM**, SDK
+**10.0.201**, runtime **10.0.5**. CPU model/process inventory permissions were denied.
+Raw evidence: `.uographs/phase11-evidence/`; detailed methodology in [PERFORMANCE](PERFORMANCE.md).
 
-| Koşu | Fingerprint ms | Analysis + verify ms | Sonuç |
+| Scenario | Fingerprint ms | Analysis + validation ms | Result |
 | --- | ---: | ---: | --- |
-| 10 proje, paylaşım öncesi full | 12667 | 27338 | PASS; 401 / 1305 / 1335 |
-| 10 proje, paylaşım sonrası full | 13360 | 16129 | PASS; aynı graph içerikleri |
-| 10 proje warm incremental | 14356 | 0 | PASS; noOp / 0 proje |
-| 10 proje leaf değişimi | 13903 | 17035 | PASS; bütün 10 proje yeniden analiz |
-| 10 proje dependent invalidation | 13933 | 16334 | PASS; bütün 10 proje yeniden analiz |
-| 100 proje full | 122481 | 136951 | PASS; 4001 / 13635 / 13935 |
-| 100 proje warm incremental | 111733 | 0 | PASS; noOp / 0 proje |
+| 10 projects, full before sharing | 12667 | 27338 | PASS, 401/1305/1335 records |
+| 10 projects, full after sharing | 13360 | 16129 | PASS, equal graph contents |
+| 10 projects, warm | 14356 | 0 | PASS noOp / zero projects |
+| 10 projects, leaf edit | 13903 | 17035 | PASS, all ten rebuilt |
+| 10 projects, dependency edit | 13933 | 16334 | PASS, all ten rebuilt |
+| 100 projects, full | 122481 | 136951 | PASS, 4001/13635/13935 |
+| 100 projects, warm | 111733 | 0 | PASS noOp / zero projects |
 
-Index senaryoları birer başarılı tekrar. Süreler CLI timer'ıdır; startup ve SQLite
-publication dahil wall time değildir. Boş DB/full ile warm/no-op ayrıdır;
-OS cache boşaltılmadı, fiziksel cache-cold **NOT RUN**. Karşılaştırmalar paralel
-çalışma/cache koşulları nedeniyle istatistiksel yüzde iyileşme iddiası değildir.
-10-proje SQLite **6.631.424 B**, 100-proje **53.084.160 B**.
-10-proje query/context üçer tekrar **0.118–0.225 sn**; 100-proje query/context
-(50.000 karakter) üçer tekrar **0.213–0.218 sn**. Yeni CLI prosesleri ve 100 ms
-harness polling dahil yaklaşık wall süresi; SQL-only microbenchmark değildir.
-100-proje 12.000 karakter context, minimum zarf 27.146 karakter olduğu için
-beklenen exit 2 verdi; bu negatif koşu daha büyük bütçeli başarıdan ayrı tutulur.
-Peak process/child-process memory **NOT RUN**; fiziksel RAM proses tüketimi değildir.
-Token tasarrufu ölçülmedi/iddia edilmedi.
+One successful repetition per index scenario. Timers exclude startup/SQLite commit;
+OS cache was not flushed and concurrent load was uncontrolled, so no percentage
+improvement claim. SQLite sizes **6,631,424 / 53,084,160 bytes**. Three read repeats
+per operation: 10-project **0.118–0.225 s**, 100-project **0.213–0.218 s** with 50,000
+character context, including new processes and 100 ms polling. A 12,000 budget on
+100 projects correctly returned exit 2 for a 27,146-character minimum envelope.
+Peak process/child RSS and token savings were not measured.
 
-## Gerçek doğrulama
+### Initial Phase 11 validation
 
-Standart VSTest ve reflection sonuçları birbirine karıştırılmadı.
-İlk teslim koşuları aşağıda korunur; son test kaynaklarıyla takip sonuçları ayrı
-tabloda yer alır.
-
-| Komut/kontrol | Sonuç |
+| Recorded command/check | Result |
 | --- | --- |
-| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, 0 warning / 0 error; final build **12.83 sn**. |
-| `dotnet test tests/UO.Graphs.UnitTests --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=release-unit.trx' --results-directory .uographs/phase11-evidence/vstest` | PASS **52/52**, skipped 0, yaklaşık 5 sn. |
-| Final binary odaklı integration, `release-integration.trx` | PASS **16/16**, 48 sn; gerçek index, trust/custom target, config/storage, Phase9 ve context regression. |
-| Tam integration suite, `full-integration.trx` | **94 PASS / 3 FAIL**, 97 test, **11m25s**. Ara koşu; aşağıdaki düzeltme/tekrarlarla karıştırılmaz. |
-| Incremental/full oracle tekrar, `final-incremental-oracle.trx` | PASS **1/1**, **5m1s**; mutation dizisi/no-op, sabit binary ile. |
-| Phase9 gerçek paket testleri, `context-regression.trx` | PASS **3/3**, 26 sn. ABP, EF Core, Refit. Önceki fazdaki assertion kapısı bu gerçek koşuda kapandı. |
-| `final-focused.trx` | PASS **11/11**, 16 sn; context budget/bounds, farklı TFM, bozuk config, SQLITE_FULL, symlink/non-DB. |
-| `hardening.trx` | PASS **14/14**, 539 ms; storage schema/SQL/rollback/concurrency + yeni storage hata testleri. |
-| `regression.trx` | PASS **8/8**, 20 sn; gerçek HelloGraph, MSBuild marker/trust, Phase6 storage/parse. |
-| `python3 scripts/test_process_safety.py ...` | PASS: gerçek SIGINT **130**, SIGKILL **-9**, concurrent writer **10**, gerçek DB backup snapshot korunur; iki ayrı koşu. |
-| `python3 scripts/test_skill.py --db .uographs/phase11-live.db --evidence .uographs/phase11-evidence/skill-read-tests.json` | PASS **10/10**, 14.168 sn. |
-| `python3 scripts/test_release_tools.py` | PASS **2/2**, generator boyut/ref/overwrite + export exclusive/literal/symlink. |
-| `python3 scripts/audit_licenses.py --check` | PASS **143** kilitli paket/sürüm; yeni dependency yok. |
-| `python3 scripts/check_contracts.py --db .uographs/phase11-evidence/perf-direct-100-final.db --index-raw .uographs/phase11-evidence/optimized-direct-10.raw --evidence .uographs/phase11-evidence/contracts` | PASS **6 gerçek envelope + 6 yanlış sürüm negatif**. Yalnız schema'da kullanılan keyword subset'i; genel JSON Schema validator conformance iddiası değil. |
-| Kaynak bütünlüğü / belge kontrolü | PASS: HelloGraph’ın 5 özgün kaynak/proje/solution dosyası ilk index hash’leriyle aynı; Python AST, yerel Markdown linkleri, whitespace, pipeline YAML parse. CI execution değildir. |
-| Bağımsız correctness ve security/test-gap ajanları | İki gerçek salt-okunur inceleme. Reference context, cancellation/output, context pruning ve harness false-pass bulguları giderildi. |
+| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, final **12.83 s**, zero warnings/errors |
+| Unit VSTest release-unit.trx | PASS **52/52**, zero skipped, about 5 s |
+| Final-binary focused integration release-integration.trx | PASS **16/16**, 48 s; real index/trust/config/storage/Phase9/context |
+| Interim full-integration.trx | **94 PASS / 3 FAIL**, 97 total, **11m25s** |
+| Stable-binary final-incremental-oracle.trx | PASS **1/1**, **5m1s** |
+| context-regression.trx | PASS **3/3**, 26 s; real ABP/EF/Refit integrations, closing their initial Phase9 assertion gate |
+| final-focused.trx | PASS **11/11**, 16 s; context/TFM/config/SQLite/symlink/non-DB |
+| hardening.trx | PASS **14/14**, 539 ms; storage/rollback/concurrency |
+| regression.trx | PASS **8/8**, 20 s; HelloGraph/trust/Phase6 |
+| test_process_safety.py | PASS twice: SIGINT **130**, SIGKILL **-9**, competing writer **10**, real DB backup preserved |
+| test_skill.py against phase11-live.db | PASS **10/10**, **14.168 s** |
+| test_release_tools.py / audit_licenses.py --check | PASS **2/2 / 143 packages** |
+| check_contracts.py on perf-direct-100-final.db and optimized-direct-10.raw | PASS **6 actual envelopes + 6 wrong-version negatives**; validator checks only used schema keywords |
+| Source/config/document checks | PASS: five original HelloGraph files retained initial hashes; AST/links/whitespace/YAML parse |
+| Independent correctness/security reviewers | Two read-only reviews; context/reference/cancellation/harness issues corrected |
 
-### Takip doğrulamaları
+### Follow-up validation
 
-Raw kanıtlar `.uographs/phase11-followup/` altında, komutlar `commands.json` ve
-VSTest sonuçları `vstest/` içindedir. Ürün binary'leri değişmedi; testler eklendi.
+Evidence: `.uographs/phase11-followup/commands.json` and vstest/. Product behavior
+was unchanged while tests were added/strengthened.
 
-| Kontrol | Sonuç |
+| Check | Result |
 | --- | --- |
-| Aynı build komutu, son test kaynakları | PASS **14.31 sn**, 0 warning / 0 error. |
-| Son unit suite, `followup-final-unit.trx` | PASS **55/55**, skipped 0; gerçek subprocess testleri dahil. |
-| Sabit binary ile tam integration, `followup-full-integration.trx` | PASS **98/98**, skipped 0, **11m35s**; generator cancellation **4.994 sn**. |
-| Son test kaynaklarıyla tam integration, `followup-final-full-integration.trx` | PASS **98/98**, skipped 0, **11m34s**. Eşzamanlı build/pack yapılmadı. |
-| Odaklı generator invocation, `generator-cancellation.trx` ve `final-generator-cancellation.trx` | VSTest socket bind **Permission denied** nedeniyle test başlamadan **ABORTED**; başarılı tam suite koşusundan ayrı tutulur. |
-| `test_release_tools.py` / `audit_licenses.py --check` | PASS **2/2** / **143** kilitli paket. |
-| Güncellenmiş skill/template ve gerçek CLI read testleri | PASS **10/10**, **12.831 sn**; `skill-read-tests.json`. |
-| Belge kontrolü | **29** Markdown belgesinde eksik yerel link yok; arşivdeki 3 göreli link düzeltildi. Python AST, whitespace ve skill parity geçti. |
-| İzole local manifest install/help/query/context | PASS; ayrı CLI home/cache, yalnız yerel nupkg. Repo tarafından üretilmiş DB okunur; index **NOT RUN**. |
-| Bağımsız tekrar incelemesi | Pipe scheduling false-pass ve cleanup timeout açığı giderildi; son kaynak incelemesinde kritik bulgu yok. |
+| Same build, final test sources | PASS **14.31 s**, zero warnings/errors |
+| followup-final-unit.trx | PASS **55/55**, zero skipped; actual subprocess tests |
+| followup-full-integration.trx | PASS **98/98**, zero skipped, **11m35s**; generator **4.994 s** |
+| followup-final-full-integration.trx | PASS **98/98**, zero skipped, **11m34s**; no concurrent build/pack |
+| Separate focused generator invocations | ABORTED before tests, VSTest SocketException (13); distinct from passing full suites |
+| Release tools / licenses | PASS **2/2 / 143** |
+| Updated skill/template real reads | PASS **10/10**, **12.831 s** |
+| Documentation | PASS, 29 Markdown files, three archived relative links fixed; AST/whitespace/parity |
+| Temporary local manifest install/help/query/context | PASS, isolated CLI home/cache/local feed; existing repo DB, index NOT RUN |
+| Follow-up review | Pipe scheduling false-pass and cleanup timeout fixed; no critical remaining source-review finding |
 
-İnceleme sonrası unit pipe handshake ve test cleanup kontrolleri güçlendirildi.
-Son unit ve tam integration suite bu kaynakları çalıştırdı; önceki koşular silinmedi.
-Ürün DLL'leri ve HelloGraph'ın 5 özgün kaynak/proje/solution dosyası değişmedi:
-`stable-inputs-final-build.json` ve `current-package-parity.json`.
+Final unit/full integration covered strengthened handshake/cleanup tests. Product
+DLL and five HelloGraph file comparisons are in stable-inputs-final-build.json and
+current-package-parity.json. Interim failures were Refit context pruning (fixed,
+3/3 repeat), a rebuild during mixed-TFM indexing (guard correctly rejected, 11/11
+repeat), and pack changing tool publish binaries during the oracle (guard rejected,
+stable repeat 1/1). No test/assertion was removed/weakened. The final total increased
+with a new test; 94/97 is not presented as 98/98.
 
-Tam suite'deki üç hata: Refit context kırpması (düzeltildi, 3/3 tekrar PASS), farklı
-TFM testi sırasında binary rebuild (input guard reddi, 11/11 tekrar PASS), incremental
-oracle sırasında pack'in publish altındaki binary'leri değiştirmesi (input guard
-reddi; sabit binary tekrar **1/1 PASS**). Eşzamanlı build/pack ile index çalıştırılmaması gerekir. Test/assertion
-silinmedi veya gevşetilmedi. Önceki 94/97 sonucu takipteki temiz 98/98 koşusuyla
-karıştırılmaz; yeni test nedeniyle toplam sayı değişti.
+Real WAL-publication/process kills, storage cancellation, literal SQL/shell input,
+snippet/traversal/budgets, and concurrent readers/writers passed. SQLite code 13 was
+real fault injection, not physically filling a disk. The trusted custom target wrote
+a controlled marker only with trust, illustrating rather than replacing OS isolation.
 
-Tam suite'de **WAL publication ortasında process kill**, analysis sırasında kill,
-storage cancellation, literal SQL/shell payload, source snippet/traversal,
-large-output/context bütçeleri ve concurrent reader/writer testleri geçti.
-SQLITE_FULL gerçek SQLite hata kodu 13 enjeksiyonudur; fiziksel disk doldurma kabulü
-değildir. MSBuild custom target gerçek controlled marker yazdı; trust yokken
-çalışmadı, kaynak proje metni değişmedi. Kurum sandbox'ının yerine geçmez.
+### Historical package/IPC evidence
 
-## Paket ve smoke
+Initial Debug pack used no-build/no-restore, single worker. The first archive had
+187 entries / 46,219,482 bytes; delivery archive **218 / 46,350,948 bytes**, SHA-256
+`4180eb28775f4c1fd0179159194e493de83933514899802c73feb4529caf7041`, under
+`.uographs/phase11-evidence/delivery-feed/`; manifest package-final.json.
+BuildHost/native SQLite payload and ABP exclusion were audited; skill overwrite
+refusal passed. A later documentation/skill archive under phase11-followup/feed/
+has entry/hash/DLL/document parity in package.json and read smoke in
+refreshed-tool/commands.json. Earlier archives remain historical artifacts.
 
-`dotnet pack src/UO.Graphs.Cli -c Debug --no-build --no-restore -m:1 -nr:false -o ...`
-ile local/global-tool biçiminde nupkg üretildi. Başlangıç arşivi 187 entry /
-46.219.482 B; teslim arşivi **218 entry / 46.350.948 B**, SHA-256
-`4180eb28775f4c1fd0179159194e493de83933514899802c73feb4529caf7041`.
-İlk teslim arşivi: `.uographs/phase11-evidence/delivery-feed/UO.Graphs.Cli.0.9.0.nupkg`;
-manifest `package-final.json`. Dağıtılmış skill kurulum/overwrite reddi ayrıca geçti. Native SQLite RID ve
-BuildHost-netcore payload'ı denetlendi, ABP fixture DLL'leri üründe yok.
+Local-feed isolated tool-path installs and help/query/context passed, but their
+initial packaged index failed **exit 5**, workspace IPC timeout, **63.939 s** in
+delivery-tool-smoke/raw.jsonl. Read smoke used a repo-created DB and did not prove
+package indexing. Separate bounded package/repo BuildHost probes both started runtime
+10.0.5 and failed named-pipe bind with **SocketException (13), exit -6**. Their
+**20/20 files matched SHA-256**, recorded in
+phase11-followup/buildhost-probe-locale.json. No permission bypass or missing-payload
+claim followed. Later permitted Release and Linux package success is recorded above.
+Direct repo HelloGraph full smoke was **15 / 20 / 23**, read in separate processes.
 
-Güncellenmiş belge ve skill başvurusunu taşıyan takip arşivi:
-`.uographs/phase11-followup/feed/UO.Graphs.Cli.0.9.0.nupkg`.
-Arşiv SHA-256, entry listesi, dört ürün DLL'i ve belge parity sonuçları
-`phase11-followup/package.json`; izole tool-path install/read smoke raw sonuçları
-`phase11-followup/refreshed-tool/commands.json` içindedir. Önceki arşiv korunur.
+## Remaining gates and backlog
 
-Yerel-only NuGet.Config üzerinden `dotnet tool install UO.Graphs.Cli --version 0.9.0
---tool-path <fresh-temp>/bin --configfile <fresh-temp>/NuGet.Config --no-cache` PASS.
-Final paket ayrı temporary tool-path’e, yalnız yerel feed ve ayrı temporary NuGet
-cache ile yeniden kuruldu. Global kurulum değiştirilmedi. Kurulu `uographs --help`, gerçek snapshot üzerinde
-query ve context PASS. **Kurulu tool'un index denemesi FAIL exit 5 (workspace IPC
-timeout)**; final teslim paketi denemesi **63.939 sn**, `delivery-tool-smoke/raw.jsonl`.
-Paketli index→query→context zinciri tamamlandı diye sunulmaz.
-Takip incelemesinde kurulu ve repo BuildHost ayrı, süre sınırlı başlangıç
-probe'larında runtime **10.0.5** açtı; ikisi de named pipe bind sırasında
-**SocketException (13): Permission denied**, exit **-6** verdi. BuildHost'un
-**20/20 dosyası SHA-256 eşit**. Raw stderr/hash kanıtı:
-`.uographs/phase11-followup/buildhost-probe-locale.json`. Yerel IPC reddi bu
-invocation için doğrulandı; izin aşılmadı, paketli index kabulü hâlâ açık.
-Doğrudan repo CLI HelloGraph full PASS **15 / 20 / 23**; aynı DB ayrı proseslerde
-query/context/skill testlerinde okundu. Paket read smoke'ı repo tarafından üretilmiş
-DB kullanır; bu ayrım açıktır.
+- Windows, on-prem Azure, and global-scope installation remain NOT RUN. Linux CI
+  is now verified and must not be listed as unexecuted. Temporary manifest indexing
+  remains unverified for that invocation; tool-path indexing has later passes.
+- Physical offline, physical disk exhaustion, peak process-tree RSS, true OS-cache-
+  cold runs, 1000-project analysis, and 100-project leaf/dependent runs remain NOT RUN.
+- Cooperative generators/post-exit pipes passed; forced malicious-generator stopping
+  and reparented-child containment require external isolation and are unverified.
+- Some restricted Python/redirected/DLL workspace invocations timed out; permitted
+  direct successes do not erase them. A historical `kill -INT 62720` was denied.
+  Follow-up lsof found no process entry, and the old perf-100.db writer lease was
+  acquired/released nonblocking (prior-lease.json); no repeat signal was sent.
+- Real Copilot E2E remains NOT RUN. File/CLI checks are not model-session acceptance.
+- Git metadata was absent in initial Phase11; later automation work had repository/
+  origin and diff checks. AGENTS and user changes remain preserved. This agent made
+  no commit/push/publish; the independently triggered successful publication is above.
+- Backlog: broader permitted agent/platform/offline matrix, process-tree RSS,
+  1000-project baseline, metadata-envelope growth, and reducing hashing/per-project
+  evaluation cost without weakening correctness.
 
-## Açık kapılar / NOT RUN / backlog
+Historical Phase11 changed areas: Roslyn indexer/preparation, Core DeliveryWriter,
+SQLite GraphStore/AssemblyInfo, CLI package metadata; Phase11 unit/integration/process/
+generator tests; synthetic_solution, benchmark, verify_release, safe_export,
+test_release_tools, test_process_safety, check_contracts; on-prem pipeline, README,
+architecture/delivery/release/performance/security/status/history/schema and skill
+references. Suggested commit:
+`fix: harden indexing and package the uographs CLI with release evidence`
 
-- Windows/Linux build/test/tool runtime ve Azure self-hosted pipeline **NOT RUN**.
-  Global scope kurulumu **NOT RUN**; temporary tool-path ve ayrı geçici local
-  manifest kurulumları canlı test edildi. Local manifest help/query/context PASS,
-  index **NOT RUN**; repo DB'si kullanıldı. Raw komutlar ve çıktılar
-  `phase11-followup/local-manifest/` altında. NuGet publish/git push yapılmadı.
-- Fiziksel ağ izolasyonu altında hazır SDK/assets offline smoke **NOT RUN**.
-  Fiziksel disk dolumu, process/child RSS ve OS-cache-cold **NOT RUN**.
-- 1000-project analiz; 100-project leaf/dependent koşuları **NOT RUN**.
-  Template/generator bunun yerine başarı sayılmaz. Kooperatif generator ve gerçek
-  post-exit pipe cancellation testleri geçti; kötü niyetli generator'ın zorla
-  durdurulması doğrulanmadı. Yeniden parent atanmış child için kurum process
-  izolasyonu/cleanup gerekir.
-- Python/redirected/DLL workspace invocation bazı koşullarda timeout verir.
-  Başarılı direct CLI sonuçları bunları ortadan kaldırmaz. Kısıtlı terminalde
-  process inventory/signal izni sınırlı. Önceki uzun redirected 100-project
-  denemesinde `kill -INT 62720` reddedilmişti. Takip kontrolünde `lsof -p 62720`
-  kayıt döndürmedi ve `perf-100.db.writer.lock` üzerinde nonblocking exclusive
-  lease alınabildi/bırakıldı (`phase11-followup/prior-lease.json`). Eski PID'ye
-  tekrar sinyal gönderilmedi; bu başarısız index koşusu başarı sayılmaz.
-- Copilot E2E önceki fazdan **NOT RUN**. Test edilmeyen CI/OS'a başarı atfedilmez.
-- İlk Faz 11 koşusunda Git metadata yoktu; o koşuda Git diff **NOT RUN**.
-  Yayın otomasyonu turunda Git repository ve origin mevcut, diff kontrol edildi.
-  AGENTS.md korunur; otomatik commit/push/publish yok.
-- Backlog: izinli izole agent'ta paketli/offline/OS matrisi; güvenilir process-tree
-  RSS; 1000-project baseline; metadata zarf büyümesi; SDK/binary hashing ve
-  project başına evaluation maliyetini correctness'tan ödün vermeden azaltma.
+## Documentation refresh validation
 
-## Değişen dosyalar
+All checks below ran on macOS ARM64 / SDK 10.0.201 for this documentation change.
+Local evidence is under `.uographs/docs-english/validation/`. The complete integration
+suite was **NOT RUN in this documentation-only pass**; the separate earlier 99/99
+macOS and Linux runs remain identified above. No restore, package publication,
+commit, or push was performed by this documentation task.
 
-- Ürün: `src/UO.Graphs.Roslyn/ProjectIndexer.cs`, `ProjectPreparation.cs`,
-  `src/UO.Graphs.Core/DeliveryWriter.cs`, `src/UO.Graphs.Storage.Sqlite/GraphStore.cs`,
-  `AssemblyInfo.cs`, `src/UO.Graphs.Cli/UO.Graphs.Cli.csproj`.
-- Test: iki test projesindeki `Phase11Tests.cs`, unit `Phase11ProcessTests.cs`,
-  integration `Phase11GeneratorCancellationTests.cs`; mevcut testler korunur.
-- Script: `synthetic_solution.py`, `benchmark.py`, `verify_release.py`,
-  `safe_export.py`, `test_release_tools.py`, `test_process_safety.py`, `check_contracts.py`.
-- Dağıtım/belge: `ci/azure-pipelines.onprem.yml`, README, ARCHITECTURE,
-  CONTEXT-EXPORT, RELEASE, PERFORMANCE, SECURITY, STATUS, history/PHASE10,
-  schemas/cli-envelope.schema.json; repo skill/template CLI başvurusu.
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -p:ContinuousIntegrationBuild=true -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=docs-unit.trx' --results-directory .uographs/docs-english/validation
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses|FullyQualifiedName~HelpAndDoctorRunWithoutLoadingTarget|FullyQualifiedName~TrustIsRequiredBeforeMalformedProjectIsEvaluated|FullyQualifiedName~MissingAssetsFailsWithoutRestoringOrCreatingDatabase|FullyQualifiedName~Phase10ApprovedIncrementalSkillWorkflowAcrossProcesses|FullyQualifiedName~CliTests.Phase9' --logger 'trx;LogFileName=docs-integration.trx' --results-directory .uographs/docs-english/validation
+dotnet run --project src/UO.Graphs.Cli -c Release --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --full --trust-project --db .uographs/docs-english/validation/graph.db
+python3 -B scripts/test_skill.py --db .uographs/docs-english/validation/graph.db --evidence .uographs/docs-english/validation/skill-read-tests.json
+python3 -B scripts/phase5_smoke.py --db .uographs/docs-english/validation/graph.db --output-dir .uographs/docs-english/validation/context-export
+python3 -B scripts/audit_licenses.py --check
+git diff --check
+```
 
-Önerilen commit: `fix: harden indexing and package the uographs CLI with release evidence`
+| Check | Actual result |
+| --- | --- |
+| Release build | PASS, **22.68 s**, **0 warnings / 0 errors** |
+| Standard Release unit tests | PASS **55/55**, zero skipped, **6 s** |
+| Focused Release integration tests | PASS **8/8**, zero skipped, **54 s**: basic CLI/trust/assets, approved incremental workflow, and real ABP/EF/Refit cases |
+| Real Release CLI index | PASS, **15 entities / 20 relationships / 23 occurrences**, two projects; fingerprint **3492 ms**, analysis/validation **5113 ms** |
+| Existing skill/README tests | PASS **10/10**, **10.766 s**, including real parser/read subprocesses and installer negatives |
+| Existing context/export smoke | PASS, **17 CLI calls**, expected negative exits, all four export formats, deterministic repeat, source hash checks, unchanged DB bytes |
+| License inventory | PASS **143** locked package/version entries; generated English inventory unchanged |
+| Markdown checks | PASS: **29 files**, **139 local links/heading targets**, balanced fences, **36 shell blocks** parsed with bash -n; upstream proper-name attribution retained |
+| Scope and whitespace | PASS: **28 changed Markdown files**, all within README/docs; git diff --check clean |
+
+Standalone smoke snapshot: `e94a504000c24445affa764a59017b8b`. Coverage remains
+**partial** because generators were disabled; index freshness was fresh and later
+reads default to notChecked. The two existing Python scripts use the prepared
+**Debug CLI** for their read/parser checks; the build, VSTest, and standalone index
+above used **Release**. Their results are not presented as one launcher/configuration.
+Context measured **10,398 / 12,000 characters**, with the same Welcome → Greet
+source evidence as the untruncated **63,736-character** full export. This is only
+that fixture/task's character measurement, not a token or general savings claim.
+
+The initial documentation character scan flagged the upstream author name
+Günther Foidl in DEPENDENCIES. It was reviewed and preserved as attribution, not
+translated or removed. The first read-only shell validation could not create a
+heredoc temporary file; the permitted rerun completed all checks. These were
+validation-environment/heuristic issues, not product test failures.
+
+Changed files: README; the 17 non-generated top-level docs Markdown files;
+all ten docs/history phase records. DEPENDENCIES, AGENTS, source/test code,
+workflows, package/lock files, and skill/template files are unchanged.
+Suggested commit: `docs: rewrite documentation in English and refresh verified status`

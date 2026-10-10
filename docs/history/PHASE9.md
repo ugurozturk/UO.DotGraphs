@@ -1,144 +1,110 @@
-# Gerçekleşen durum
+# Phase 9 — ABP, EF Core, and Refit
 
-Son güncelleme: 2026-10-09.
+Recorded **2026-10-09**. The modules were implemented and limited local static
+acceptance passed, but **the full Phase 9 gate remained open in this run** because
+standard VSTest/startup and subprocess workspace tests did not pass. Phases 10–11
+had not started. Later standard integration passes are recorded in
+[STATUS](../STATUS.md); they do not rewrite the failures below.
+Product **0.9.0**, JSON 4 / SQLite 3 / delivery 1. Prior: [Phase 8](PHASE8.md).
 
-**Faz 9 uygulandı; üç modülün aşağıda belirtilen sınırlı macOS statik kabulü geçti.**
-Standart VSTest ve alt proses workspace entegrasyonu açık kaldığı için Faz 9'un
-**tam doğrulama kapısı kapatılmadı**. Faz 10–11 başlamadı. Ürün **UO.Graphs 0.9.0**,
-CLI **uographs**. Önceki [Faz 8 kanıtı](../history/PHASE8.md) arşivlendi.
+## Delivered scope
 
-## Uygulananlar ve ayrı kapsam
+- ABP **10.1.1** service/module/repository contracts and conventional DI candidates,
+  lifetime/exposure/disable overrides. Conventional endpoint candidates require
+  static Create assembly configuration; RemoteService/NonAction filters apply.
+  Candidates remain inferred with null route/verb. Repositories do not imply tables.
+- EF Core **10.0.5** context/set/entity/configuration contracts and Table/Column/
+  narrow fluent mapping declarations. Overrides remain separate declarations;
+  runtime/scanning/Ignore/owned/custom-builder configuration stays unresolved.
+  No effective model or SQL claim.
+- Refit **8.0.0** real attributes/bound interface contracts and call edges. Equal
+  routes across services remain distinct; base address/remote target unresolved.
+  Local route similarity never creates a service edge. Custom/multiple/static/
+  default-method/runtime configuration negatives remain separate.
+- Nine relationship kinds and optional Framework/ModelMapping/HttpContract metadata
+  use existing atomic storage/query/delivery. No product dependency or new layer.
+- ABP LGPL-3.0-only closure isolated in a non-packable fixture, excluded from
+  product/test/runner closure by audit. EF/Refit MIT and NUglify/MyCSharp license
+  evidence checked. Inventory: **143** package/version entries.
 
-- **ABP 10.1.1:** ApplicationService/IApplicationService sözleşmeleri, module
-  DependsOn, conventional DI adayları, ExposeServices/Dependency/Disable override,
-  IRepository ve inherited IBasic/IReadOnly generic entity kullanımı çıkarılır.
-  ConventionalControllers.Create assembly kanıtı yoksa conventional endpoint
-  adayı üretilmez. RemoteService/NonAction filtreleri uygulanır. Configuration
-  kanıtlı servisler `endpointCandidate` ve inferred kalır; convention/custom route
-  çözümlenmediği için verb/route null. Repository'den tablo/schema tahmini yok.
-- **EF Core 10.0.5:** DbContext, DbSet, ModelBuilder.Entity, configuration contract,
-  Table/Column annotation ve dar fluent ToTable/ToView/HasColumnName bildirimleri
-  modellenir. Annotation/fluent override ayrı kaynak bildirimidir. Runtime
-  table/schema/column, scanning, Ignore, owned mapping ve custom builder wrapper
-  yolu açık unresolved kayıt/tanı üretir. Efektif model veya SQL iddiası yok.
-- **Refit 8.0.0:** Gerçek metadata attribute + bound interface method kullanılır;
-  HTTP_CONTRACT ve INVOKES_HTTP bağları vardır. Aynı route'a sahip iki servis
-  ayrıdır. BaseAddress ve remote endpoint unresolved; local MVC route benzerliği
-  ilişki kurmaz. Custom/multiple HTTP attribute, static/default method ve runtime
-  client configuration negatifleri ayrıdır.
-- Core'a dokuz ilişki yönü ve optional Framework/ModelMapping/HttpContract metadata
-  eklendi. Mevcut SQLite transaction/payload, dependencies/impact/path/context/export
-  hattı kullanılır. JSON v4 / SQLite 3 / delivery 1 değişmedi; yeni ürün paketi/katman yok.
-- ABP'nin **LGPL-3.0-only** bağımlılıkları yalnız ayrı, non-packable fixture içindedir.
-  Ürün/test/runner dependency closure'ına girmeleri audit hatasıdır. EF/Refit MIT;
-  NUglify BSD/Apache ve bundled MyCSharp MIT ayrıca doğrulandı. Toplam 143 lock
-  package/version kaydı için lisans kanıtı var; [DEPENDENCIES](../DEPENDENCIES.md).
+Exact matrices, sources, risks, and test names: [ABP-EF-REFIT](../ABP-EF-REFIT.md).
 
-Tam sürüm/API kaynakları, her modülün supported/partial/unsupported matrisi,
-yanlış-pozitif riskleri ve test isimleri: [ABP-EF-REFIT](../ABP-EF-REFIT.md).
+## Recorded verification
 
-## Gerçek doğrulama
+macOS 27.0 ARM64, SDK 10.0.201, MSBuild 18.3.0, runtime/reference pack 10.0.5,
+Roslyn 5.0.0.0.
 
-macOS 27.0 ARM64 / osx-arm64; SDK **10.0.201**, MSBuild **18.3.0**,
-.NET runtime/reference pack **10.0.5**, Roslyn **5.0.0.0**.
-
-| Gerçek komut/kontrol | Sonuç |
+| Command/check | Result |
 | --- | --- |
-| `dotnet --info` | PASS, ortam yukarıda. |
-| `dotnet restore UO.Graphs.slnx --ignore-failed-sources -p:NuGetAudit=false -m:1 -nr:false` | İlk koşu Refit fixture PackageId çakışması NU1108; ayrı PackageId düzeltildi, açık development restore geçti. |
-| `dotnet restore UO.Graphs.slnx --locked-mode --ignore-failed-sources -m:1 -nr:false -p:NuGetAudit=false` | PASS exit 0. Runtime restore/download eklenmedi. |
-| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS exit 0; **0 warning / 0 error**, son koşu **8.71 sn**; üç gerçek paket fixture da derlendi. |
-| `dotnet restore scripts/TestRunner/TestRunner.csproj --ignore-failed-sources -p:NuGetAudit=false -m:1 -nr:false` | PASS exit 0; yalnız mevcut test bağımlılıkları. |
-| `dotnet build scripts/TestRunner/TestRunner.csproj --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS exit 0, 0 warning / 0 error, **1.97 sn**. |
-| `dotnet scripts/TestRunner/bin/Debug/net10.0/TestRunner.dll UnitTests .uographs/phase9-evidence/unit-final.json` | PASS exit 0; **49/49**, failed=0. Aynı xUnit assertion'larının soketsiz, sıralı invocation'ı; VSTest sonucu değildir. |
-| `dotnet test tests/UO.Graphs.UnitTests --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~Phase9 --logger 'trx;LogFileName=phase9-initial.trx' --results-directory .uographs/phase9-tests` | **ABORTED exit 1 / test execution NOT RUN**; VSTest SocketException(13), yerel TCP listener izni yok. |
-| `dotnet scripts/TestRunner/bin/Debug/net10.0/TestRunner.dll CliTests.Phase9 .uographs/phase9-evidence/integration-initial.json` | **FAIL exit 1, 0/3**; her testin başlattığı CLI workspace load ~63 sn sonra timeout/exit 5. Assertion gevşetilmedi. |
-| Doğrudan üç CLI index, aşağıdaki komutlar | PASS, **3/3 exit 0**; son binary ve gerçek fixture kaynakları. |
-| `python3 scripts/phase9_smoke.py` | PASS exit 0; **ABP / EF / Refit 3 ayrı kabul**, **12 ayrı CLI proses**. |
-| `python3 scripts/audit_licenses.py --check` | PASS exit 0; **143** kilitli paket/sürüm, fixture LGPL ayrımı denetimli. |
-| Source/config parse, whitespace, yerel Markdown bağlantıları | PASS; **184 dosya** incelendi. Git metadata yok, dosya tabanlı kontrol. |
+| `dotnet --info` | PASS |
+| Solution restore with ignore-failed-sources/NuGetAudit=false/single worker | Initial Refit PackageId collision NU1108; corrected, then PASS |
+| `dotnet restore UO.Graphs.slnx --locked-mode --ignore-failed-sources -m:1 -nr:false -p:NuGetAudit=false` | PASS; explicit development step |
+| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, 8.71 s, 0 warnings/errors; all three real-package fixtures |
+| TestRunner restore with ignore-failed-sources/NuGetAudit=false/single worker | PASS, existing test dependencies only |
+| TestRunner build with no-restore/single worker/no shared compilation | PASS, 1.97 s, 0 warnings/errors |
+| `dotnet scripts/TestRunner/bin/Debug/net10.0/TestRunner.dll UnitTests .uographs/phase9-evidence/unit-final.json` | PASS **49/49**, sequential socket-free invocation of xUnit assertions; not VSTest |
+| Standard filtered Phase9 unit VSTest | **ABORTED exit 1**, execution NOT RUN, SocketException (13) listener denial |
+| `dotnet scripts/TestRunner/bin/Debug/net10.0/TestRunner.dll CliTests.Phase9 .uographs/phase9-evidence/integration-initial.json` | **FAIL 0/3**, each CLI workspace timeout after about 63 s, exit 5 |
+| Three direct CLI indexes below | PASS **3/3**, exit 0 |
+| `python3 scripts/phase9_smoke.py` | PASS, three module checks / 12 separate CLI processes |
+| `python3 scripts/audit_licenses.py --check` | PASS, **143** package/version entries |
+| Source/config/whitespace/links | PASS, 184 files |
 
-49 birim vakanın **14'ü yeni Faz 9 vakasıdır**: ABP **5**, EF **5**, Refit **4**.
-Üç compilation-error theory satırı ilgili modülün sayısına dahildir. İkinci kez
-sayılmaz. Önceki 35 vaka da korunur ve geçer. Yeni üç integration testi kaynakta
-vardır fakat bu ortamda başarılı sayılmaz; eski integration suite bu tur **NOT RUN**.
+The 49 unit cases included 14 new ones: ABP 5, EF 5, Refit 4, including their three
+compilation-error theory rows once. Previous 35 passed. The new three integrations
+were not successful in this run; old integration regressions were NOT RUN.
+[TestRunner](../../scripts/TestRunner/README.md) uses fresh instances, awaits Tasks,
+disposes IDisposable, and rejects unsupported lifecycle/data/skip shapes; it does
+not verify xUnit discovery/parallelization or replace standard VSTest.
 
-Soketsiz koşucu [TestRunner](../../scripts/TestRunner/README.md), mevcut test methodlarını
-Fact/InlineData ile fresh instance üzerinde çağırır, Task bekler, IDisposable kapatır,
-unsupported test lifecycle/data/skip davranışını reddeder. xUnit discovery,
-parallelization veya standart VSTest çalışmasını doğruladığı iddia edilmez.
+```sh
+dotnet test tests/UO.Graphs.UnitTests --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~Phase9 --logger 'trx;LogFileName=phase9-initial.trx' --results-directory .uographs/phase9-tests
+dotnet run --project src/UO.Graphs.Cli --no-build --no-restore -- index samples/Phase9/Abp/Abp.csproj --full --trust-project --db .uographs/phase9-abp.db
+dotnet run --project src/UO.Graphs.Cli --no-build --no-restore -- index samples/Phase9/EfCore/EfCore.csproj --full --trust-project --db .uographs/phase9-efcore.db
+dotnet run --project src/UO.Graphs.Cli --no-build --no-restore -- index samples/Phase9/Refit/Refit.csproj --full --trust-project --db .uographs/phase9-refit.db
+```
 
-## Gerçek CLI smoke
+## CLI evidence
 
-Doğrudan çağrıların öneki:
-`dotnet run --project src/UO.Graphs.Cli --no-build --no-restore --`.
+| Module | Entities / relationships / occurrences | Snapshot |
+| --- | --- | --- |
+| ABP | **47 / 220 / 323** | `9b841a6252664013b88b80419fcbee81` |
+| EF | **53 / 200 / 247** | `164a0081932c4a5bb3bc00d7377c99a1` |
+| Refit | **42 / 147 / 163** | `c029944fc1e545c7acb7a4ea05ab90f3` |
 
-| Argümanlar | Sonuç: entity / relationship / occurrence |
-| --- | --- |
-| `index samples/Phase9/Abp/Abp.csproj --full --trust-project --db .uographs/phase9-abp.db` | exit 0; **47 / 220 / 323** |
-| `index samples/Phase9/EfCore/EfCore.csproj --full --trust-project --db .uographs/phase9-efcore.db` | exit 0; **53 / 200 / 247** |
-| `index samples/Phase9/Refit/Refit.csproj --full --trust-project --db .uographs/phase9-refit.db` | exit 0; **42 / 147 / 163** |
+All partial and freshness unknown due to runtime/configuration/generator/dependency
+limitations. Separate DLL reads verified ABP inferred handler→repository paths and
+hidden-service negatives; EF annotation/fluent/dynamic/captured/computed mapping
+boundaries; Refit equal-route separation, call→contract paths, and no local endpoint
+binding. Full exports were untruncated. Commands, results, status/path/context/export
+are in `.uographs/phase9-evidence/`, including smoke-commands.json and smoke-results.json.
+Actual SQLite CLI output, not hardcoded graphs, supplied assertions.
 
-Son snapshot'lar: ABP `9b841a6252664013b88b80419fcbee81`,
-EF `164a0081932c4a5bb3bc00d7377c99a1`, Refit `c029944fc1e545c7acb7a4ea05ab90f3`.
-Üçü de partial; configuration/runtime/generator eksikleri açık. Freshness unknown:
-custom MSBuild/package input closure kanıtlanmadığından reuse kapalı. Faz 6 no-op
-veya performans kapsamı bu fazda genişletilmedi.
+## Corrections, refusal, and open gates
 
-Smoke script bu gerçek DB'lerde ayrı `dotnet .../uographs.dll` prosesleriyle:
+Refit fixture AssemblyName/PackageId fixed NU1108; ABP lifetime used its real
+constructor after CS0655; Refit static HTTP CS0539 negative moved to generator-off
+semantic compilation while normal fixtures built with generators. Duplicate TPA
+fixture paths and a stalled implicit runner build were corrected by explicit build
+and direct DLL invocation. Review found EF computed/captured property and runtime
+schema/column, plus Refit multiple-attribute false certainty; implementation and
+negative tests were fixed without weakening assertions.
 
-- ABP'de inferred HANDLED_BY → exact REPOSITORY_ENTITY iki adımlı path, inferred
-  kapalıyken boş path, context, hidden-service negatifleri, module/repository export;
-- EF'de annotation/fluent çakışması, doğru column, dinamik schema, custom/scanning
-  belirsizliği, captured/computed property negatifleri ve context → entity sorgusu;
-- Refit'te aynı route'lu iki contract, local endpoint'e hedef bağlanmaması,
-  call → contract path, base address belirsizliği ve context/export
+A request to run standard VSTest outside the sandbox was automatically rejected
+(`sandbox_approval=false`). Policy was not bypassed; fallback/direct successes did
+not make the rejected command pass. This run left standard unit/new integration/
+regression execution for an IPC-permitted environment. Later closure appears in STATUS.
 
-doğrular. Full export'larda truncated=false. Tam komut/exit dizisi
-`.uographs/phase9-evidence/smoke-commands.json`, ayrı sonuçlar `smoke-results.json`,
-status/path/context/export JSON'ları aynı dizindedir. Fixture output'u hardcode
-graph yerine kullanılmaz; SQLite'dan CLI export'ları assertion girdisidir.
+Windows/Linux, installed tool, physical offline, and large-scale performance were
+NOT RUN. No user application or inaccessible system was analyzed; no host/DbContext/
+migration/DB/HTTP/MCP/LLM/telemetry was started or added. Git status 128 reflected
+absent metadata; diff NOT RUN, file checks passed. AGENTS preserved; no commit/push/publish.
 
-## Ara hatalar, açık kapı ve sınırlar
+## Changed files
 
-- Refit fixture adı başlangıçta package ile aynıydı (NU1108); AssemblyName/PackageId
-  ayrıldı. ABP nullable Lifetime named argument CS0655 verdi; gerçek ctor kullanıldı.
-  Refit 8 generator static HTTP method için CS0539 verdi; bu negatif shape gerçek
-  DLL semantik compilation testinde, normal fixture ise çalışan generator ile derlenir.
-- İlk custom-runner vaka hazırlığında duplicate TPA path hatası düzeltildi; source
-  assertions değişmedi. Varsayılan `dotnet run` runner build çağrısı bu ortamda çıktı üretmeden
-  bekledi; kesildiğinde exit 1 döndü. Doğrulamalar açık `build -m:1 -nr:false`
-  ardından doğrudan DLL ile yapıldı.
-- Bağımsız API/kod incelemesi EF captured/computed property, runtime schema/column ve
-  Refit çoklu attribute yanlış kesinliklerini buldu; üretim kodu düzeltildi ve ayrı
-  negatif testleri geçti. İkinci ajan dosya değiştirmedi/test sonucu iddia etmedi.
-- Standart VSTest için sandbox dışı çalıştırma talebi izin politikası tarafından
-  **otomatik reddedildi** (`sandbox_approval=false`). İzin/terminal politikası aşılmadı.
-  Soketsiz fallback ve doğrudan CLI kabulü bu reddedilen koşunun yerine PASS yazmaz.
-- Üç alt-proses integration testi workspace timeout nedeniyle başarısız kaldı.
-  **Faz 9 tam kapısı:** IPC'ye izin veren ortamda standart unit + üç yeni integration
-  ve ilgili integration regresyonlarını çalıştırıp sonucu kaydetmek gerekir.
-- Windows/Linux, paketlenmiş tool, fiziksel offline ağ izolasyonu ve büyük solution
-  performansı **NOT RUN**. Runtime host/DB/HTTP kabulü statik analiz kapsamı dışındadır.
-- Kullanıcı projesi veya erişilmeyen bir sistem analiz edilmedi. Yalnız fixture'lar
-  ve ürün kaynakları incelendi. Uygulama host'u, DbContext, migration, DB bağlantısı,
-  HTTP isteği, MCP/servis/LLM/API key/telemetry eklenmedi.
-- `git status --short` exit 128: klasörde Git metadata yok. Git diff **NOT RUN**;
-  AGENTS.md korunur; commit/push/publish yapılmadı.
+Core snapshot/relationships/query; new Abp/EfCore/Refit extractors and FrameworkSymbols;
+extractor/indexer wiring, CLI/version, package/solution/locks, three fixtures,
+Phase9 unit/integration/direction tests, phase9_smoke/TestRunner/audit tooling,
+ABP-EF-REFIT/Phase8 history/NUglify license, README and related contracts/status/inventory/notices.
 
-## Değişen dosyalar
-
-- Core: `GraphSnapshot.cs`, `Relationships.cs`, `GraphQuery.cs`.
-- Roslyn: yeni `Frameworks/AbpExtractor.cs`, `EfCoreExtractor.cs`, `RefitExtractor.cs`,
-  `FrameworkSymbols.cs`; `FrameworkExtraction.cs`, `ProjectIndexer.cs`.
-- CLI sürümü: `src/UO.Graphs.Cli/Program.cs`; `Directory.Build.props`.
-- Config: `Directory.Packages.props`, `UO.Graphs.slnx`, restore ile değişen lock'lar.
-- Fixture: `samples/Phase9/{Abp,EfCore,Refit}` csproj/source/lock dosyaları.
-- Tests: yeni unit/integration `Phase9Tests.cs`; `RelationshipTests.cs` yön tablosu.
-- Script: `phase9_smoke.py`, `TestRunner` csproj/source/lock/README,
-  `audit_licenses.py` fixture lisans istisnası ve gerçek lisans doğrulamaları.
-- Docs: `ABP-EF-REFIT.md`, `history/PHASE8.md`, `licenses/NUglify-1.21.17.txt`,
-  `STATUS.md`, `ARCHITECTURE.md`, `PRODUCT.md`, `RELATIONSHIPS.md`, `QUERIES.md`,
-  `DEPENDENCIES.md`, `README.md`, `THIRD-PARTY-NOTICES.txt`.
-
-Önerilen commit: `feat: analyze ABP EF Core and Refit with bounded semantic evidence`
+Suggested commit: `feat: analyze ABP EF Core and Refit with bounded semantic evidence`

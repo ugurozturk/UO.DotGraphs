@@ -1,8 +1,10 @@
-# Incremental indexing ve güncellik (Faz 6)
+# Incremental indexing and freshness
 
-Ürün 0.6.0; JSON v4'e eklenen alanlar, SQLite schema 3'te isteğe bağlı `fingerprint`
-tablosu. Eski snapshot okunur; manifest yoksa kontrol sonucu `unknown`, ilk index
-bütün seçili proje kümesini yeniler. Context/export format v1 korunur.
+Incremental indexing uses query JSON v4, SQLite schema 3 with an optional
+`fingerprint` table, and context/export format 1. It was introduced in product
+0.6.0; the current product is **0.9.0**. Legacy snapshots without a manifest remain
+readable where their schema allows; checked freshness is unknown, and the next
+index rebuilds the selected scope.
 
 ```sh
 uographs index App.slnx --trust-project --incremental
@@ -13,113 +15,114 @@ uographs context MyMethod --require-fresh
 uographs export --format json --check-freshness
 ```
 
-## Index sözleşmesi
+## Index contract
 
-- Varsayılan `--incremental`; `--full` ile birlikte verilemez. İki mod da MSBuild
-  değerlendirmesinden önce açık `--trust-project` ister. Otomatik restore yoktur.
-- Granularity: **entireSelectedProjectClosure**. Bir girdi/context değişirse tüm
-  seçili projeler ve proje referansları yeniden analiz edilir. Değişmeyen dosyalar
-  da yeniden bağlanır. Method/file-level reuse veya seçici project reuse yoktur.
-- Yalnızca dependency manifesti tamamlanabilmiş, içeriği ve değerlendirmesi aynı
-  snapshot için `outcome: noOp`, `projectsAnalyzed: 0`, `analysisMilliseconds: 0`.
-  Roslyn workspace, compilation, symbol/relationship analizi ve DB replacement
-  yapılmaz; snapshot ID korunur. SDK kontrolü, MSBuild evaluation/preprocess ve
-  SHA-256 taraması yapılır. No-op sıfır I/O veya sıfır MSBuild maliyeti değildir.
-- Diğer durumlarda `rebuiltAllProjects`; full modu her zaman bu yolu kullanır.
-  Dosya/simge ekleme, silme, taşıma, imza/overload, global using, public API,
-  configuration/TFM/defines ve dependency değişimleri aynı geniş invalidation'a
-  tabidir. Eski entity, edge, occurrence ve inference sonuçları transaction'da
-  tamamen değiştirilir. Faz 7–9 framework analyzer'ları bu fazda eklenmez.
-- Index JSON'da mod, granularity, outcome, analiz edilen proje sayısı, fingerprint/
-  analiz milisaniyeleri, hashlenen dosya/byte sayısı ve dependency eksikleri vardır.
-  Süreler measured wall-clock; analysis süresi yayın öncesi doğrulamayı da içerir.
-  Index cevabındaki freshness yayın öncesi validation sonucudur; yöntemi
-  `indexEvaluationAndContentValidation`, süresi evaluation + analiz + son kontrol
-  toplamıdır (SQLite commit hariç). Kalıcı freshness etiketi sonraki read için
-  tekrar kullanılmaz; sonraki read varsayılan olarak `notChecked` döner.
+Incremental is the default and cannot be combined with `--full`. Both modes
+require trust before target MSBuild evaluation; neither restores dependencies.
+Granularity is **entireSelectedProjectClosure**: any changed input/context rebuilds
+all selected projects and their reference closure, including unchanged files.
+There is no method/file reuse or selective project reuse.
+
+Only an equal, complete dependency manifest and evaluation allow `outcome: noOp`,
+`projectsAnalyzed: 0`, and `analysisMilliseconds: 0`. No Roslyn workspace,
+compilation, semantic extraction, or database replacement occurs; snapshot ID is
+preserved. SDK selection, MSBuild evaluation/preprocessing, and SHA-256 scans
+still run, so a no-op is not zero I/O or zero MSBuild cost.
+
+All other cases produce `rebuiltAllProjects`; full mode always takes this path.
+Source/symbol additions, deletions, moves, signatures, overloads, global usings,
+public API, configuration/TFM/defines, and dependencies follow this broad
+invalidation policy. Entities, edges, occurrences, and framework inference records
+are completely replaced in one transaction.
+
+Index JSON reports mode, granularity, outcome, analyzed project count, fingerprint/
+analysis milliseconds, hashed file/byte counts, and dependency limitations.
+Analysis timing includes pre-publication validation. Index freshness uses
+`indexEvaluationAndContentValidation` and covers evaluation, analysis, and final
+validation, excluding SQLite commit. This result is not reused as freshness for
+later reads, whose default remains `notChecked`.
 
 ## Dependency fingerprint
 
-Dosya tarihleri yeniden kullanım kararı vermez. Kaynak ve girdiler **ham dosya
-byte SHA-256** ile, dosya isimleri de sıralı inventory ile karşılaştırılır. Böylece
-aynı mtime/uzunlukla içerik değişimi, ekleme/silme/taşıma yakalanır.
+Reuse depends on **raw-byte SHA-256** plus sorted file inventory, not timestamps.
+Same-size/same-mtime edits and additions/deletions/moves therefore invalidate.
+The tracked model includes:
 
-- Root altı kaynak/input inventory; solution/project dosyaları, additional inputs,
+- Root source/input inventory, solution/project files, additional inputs,
   editorconfig, ancestor Directory.Build.props/targets, Directory.Packages.props,
-  global.json ve NuGet config. Eksik ancestor girdilerinin sonradan oluşması izlenir.
-  MSBuild user/extensions/SDK/Roslyn dizinleri ve evaluated CustomBefore/After
-  import yolları da izlenir; henüz mevcut olmayan örtük importlar atlanmaz.
-- MSBuild preprocess'ten gerçek import dosyaları ve preprocess digest'i; evaluated
-  Compile/ProjectReference/AdditionalFiles/Analyzer/EditorConfigFiles girdileri,
-  TFM/configuration/defines, language/nullable/optimization gibi evaluated options.
-  MSBuild'in item metadata'sındaki access/create/modify tarihleri digest dışındadır.
-- Assets/lock ve NuGet'in ürettiği props/targets; assets içindeki package köklerinin
-  içerikleri. Seçili SDK, reference packs, workload manifestleri ve çalışan tool
-  dizininin içerikleri; SDK installation üyeliği ve dotnet host. Böylece compiler,
-  analyzer, tool/çıkarım kuralları ve referans assembly değişimleri geçersiz kılar.
-- Bütün index options, runtime/OS/architecture/culture/çalışma dizini ve process environment digest'i; ortam değerleri/secret'lar
-  kaydedilmez. İç MSBuildLocator başlangıcının process environment'a yaptığı
-  ayarlar dış kullanıcı girdisi sayılmaz; çağrının başlangıç ortamının digest'i saklanır.
-  Preparation/preprocess alt süreçleri aynı başlangıç environment kopyasıyla
-  çalıştırılır; Locator'ın iç ayarları ikinci değerlendirmeyi değiştirmez.
-- `bin`, `.git`, `.uographs` olağan kaynak taramasından dışlanır. `obj` altında
-  kaynak C#, editorconfig, JSON/props/targets izlenir; keyfi binary/cache taranmaz.
-  SDK'nın ilk workspace açılışında oluşturduğu standart obj kaynaklarının Roslyn
-  tarafından tüketilmiş decoded içeriği diskle doğrulanır, son raw hash'leri saklanır.
-  Hedef DB, WAL/SHM/journal ve writer lock dosyaları inventory dışıdır.
+  global.json, and NuGet config. Missing ancestor files are tracked for later creation.
+  MSBuild user/extensions/SDK/Roslyn locations and evaluated CustomBefore/After
+  imports are included, even where an implicit import does not yet exist.
+- Actual preprocessed imports/digest; evaluated Compile, ProjectReference,
+  AdditionalFiles, Analyzer, EditorConfigFiles, TFM/configuration/defines, and
+  language/nullable/optimization options. Item access/create/modify timestamps are excluded.
+- Assets/locks and NuGet-generated props/targets; package-root contents; selected
+  SDK, reference packs, workload manifests, tool-directory contents, SDK installation
+  membership, and dotnet host. Compiler/analyzer/rule/reference changes invalidate.
+- Index options and runtime/OS/architecture/culture/working-directory/environment
+  digest. Environment values/secrets are not stored. Preparation subprocesses use
+  the invocation's initial environment, excluding Locator's internal mutations.
 
-Tamamlık, doğrulanmış **10.0.201 base Microsoft.NET.Sdk deklaratif input modeli**
-içindir; her MSBuild programının bütün dış dünyasını bildiğimiz iddiası değildir.
-Custom imports/targets/tasks, property functions/existence koşulları, bilinmeyen
-MSBuild property'leri, external/çıktı dizini item pattern'leri, doğrudan assembly
-Reference, base dışı SDK ve generator execution dependency kümesini belirsiz
-bırakır. Bilinen dosyalar yine hashlenir; `dependencyFingerprint.complete: false`
-ve somut nedenler kaydedilir. **No-op kapatılır, her index tüm kapsamı analiz eder.**
-Generator izinli olduğunda arbitrary dış dosya/saat/environment girdileri nedeniyle
-reuse yapılmaz. Bu güvenli fallback bilerek agresiftir; kolay genişletilebilir bir
-hash cache veya yalnız dosya tarihine dayalı iyimser reuse değildir.
+Ordinary scanning excludes bin, .git, and .uographs. Under obj it tracks source C#,
+editorconfig, JSON/props/targets, not arbitrary caches/binaries. Standard obj sources
+created during initial loading are compared against Roslyn's consumed decoded text,
+then their final raw hashes are stored. The chosen database and WAL/SHM/journal/
+writer-lock files are excluded.
 
-Tarama okunamayan dosya/symlink yüzünden yapılamıyorsa işlem açıklayıcı hatayla
-biter; doğrulanmamış snapshot yayınlanmaz. Hash maliyeti geniş inventory nedeniyle
-büyük olabilir; performans bütçesi Faz 11 yerine geçirilmez.
+Completeness refers to the validated **SDK 10.0.201 base Microsoft.NET.Sdk
+declarative input model**, not every MSBuild program's external dependencies.
+Custom imports/targets/tasks, property functions/existence conditions, unknown
+properties, external/output item patterns, direct assembly references, other SDKs,
+and generator execution can leave dependencies unproven. Known files are still
+hashed; `dependencyFingerprint.complete: false` and reasons are stored.
+**No-op is disabled and each index rebuilds the scope.** Permitted generators also
+disable reuse because arbitrary files/time/environment can affect their output.
 
-## Güncellik
+Unreadable or symlinked inventory inputs fail explicitly; an unvalidated snapshot
+is not published. Broad SDK/package hashing can be costly; see actual
+[measurements](PERFORMANCE.md).
 
-Status, query, context ve tüm export formatları aynı freshness sözleşmesini kullanır:
+## Freshness
 
-| Seçenek/sonuç | Anlam |
+Status, query, context, and every export format share this contract:
+
+| Option/result | Meaning |
 | --- | --- |
-| Varsayılan `notChecked` | Dosya hash kontrolü yok; `method: none`, 0 hash file/byte/ms. |
-| `--check-freshness` | Manifest inventory/content ve environment denetlenir; MSBuild/restore/subprocess yok. |
-| `fresh` | Kontrol sırasında izlenen girdiler eşit ve manifest kapsamı tamamlanmış. |
-| `stale` | İzlenen içerik, üyelik veya ortam değişmiş. |
-| `unknown` | Eski snapshot/eksik manifest, dependency eksikleri veya okuma hatası. |
-| `--require-fresh` | Kontrolü açar; stale/unknown için **exit 9**, stderr ve boş stdout. |
+| Default `notChecked` | No content hashing; method none and zero hash file/byte/ms |
+| `--check-freshness` | Check manifest inventory, contents, and environment; no MSBuild/restore/subprocess |
+| `fresh` | Tracked inputs match at check time and dependency model is complete |
+| `stale` | Tracked content, membership, or environment changed |
+| `unknown` | Legacy/missing manifest, dependency limitations, or read error |
+| `--require-fresh` | Enables checking; stale/unknown yield exit 9, explanatory stderr, empty stdout |
 
-`freshnessCheck` metot, gerçekten hashlenen file/byte sayısı, elapsed ms ve nedenleri açıklar.
-Eksik-dosya/üyelik işaretleri dosya sayısına dahil edilmez. Okuma kesilirse
-`countsComplete: false`; sayılar tamamlanan dosyaların ölçülen alt sınırıdır. Kontrol
-snapshot'ın kendi transaction'ı içindeki manifestle yapılır; farklı nesil graph ve
-manifest karışmaz. Read komutları DB'yi değiştirmez. Freshness ile coverage ayrı:
-compiler hataları/generator atlama yüzünden partial snapshot'ın izlenen girdileri
-fresh olabilir; bu, eksik analizin tamamlandığı anlamına gelmez.
+`freshnessCheck` records method, actual hashed files/bytes, elapsed time, and
+reasons. Missing-file/membership markers do not count as files. Interrupted reads
+report `countsComplete: false`; counts are measured lower bounds. The manifest is
+read in the same transaction as its graph, never from another generation. Read
+commands do not modify the database.
 
-Freshness kontrolü bir dosya sistemi transaction'ı değildir. Kontrolden sonra
-kaynak değişebilir; indeksleme sırasında kaynakların stabil tutulması gerekir.
-Yayın öncesi ikinci evaluation/content ve tüketilmiş kaynak kontrolü gözlenen
-concurrent değişiklikte index'i reddeder; otomatik sonsuz retry yapmaz.
+Coverage is independent: a partial graph caused by compilation errors or skipped
+generators can have fresh tracked inputs without becoming complete analysis.
+A filesystem check is not an atomic source snapshot; files may change afterward.
+Keep inputs stable during indexing. A second evaluation/content check plus consumed
+source validation rejects observed concurrent changes before publication; no
+unbounded retry is attempted. Do not build/pack the tool while indexing with it,
+since its binaries are fingerprint inputs.
 
-## Atomiklik ve concurrency
+## Atomicity and concurrency
 
-Yerel DB için processler arası exclusive writer lease analizden önce alınır ve
-commit'e kadar tutulur. Başka writer **exit 10** alır. Lock dosyasının varlığı
-kilit anlamına gelmez; OS dosya handle kilidi proses sonlanınca bırakılır. Dosya
-silinmez, böylece farklı lock inode'ları üzerinden yarış oluşmaz.
+An exclusive cross-process OS writer lease is acquired before analysis and held
+through commit. A competing writer gets exit **10**. The existence of the lock
+file does not mean the lease is held; the OS releases its handle lock on process
+exit. The lock file is retained to avoid races between different lock inodes.
 
-SQLite WAL + tek transaction graph ve manifesti birlikte yayınlar. Her reader tek
-read transaction kullanır: eski veya yeni nesli görür, yarım graph görmez. Mevcut
-reader yazıcı sırasında eski nesli okumaya devam eder. Hata/iptalde rollback;
-proses ölümünde SQLite recovery son commit'i korur. Ctrl-C exit 130; cancellation
-preparation/workspace ve publication sınırlarında işlenir. İlk index kesilirse
-henüz tamamlanmış snapshot yoktur. Destek yerel dosya sistemidir; network filesystem
-ve farklı hardlink isimleriyle aynı DB'ye erişim bu kabulün dışındadır.
+SQLite WAL and one transaction publish graph/manifest together. Each reader uses
+one read transaction and sees an old or new generation, never a partial mixture.
+Existing readers can continue reading the old generation. Errors/cancellation roll
+back; process death leaves the last commit recoverable. Ctrl-C returns **130**.
+An interrupted first index has no completed snapshot yet.
+
+Acceptance covers local filesystems. Network filesystems, accessing the same DB
+through different hardlink names, and physical power-loss testing remain outside
+that evidence. [SECURITY](SECURITY.md) distinguishes real process/cancellation
+checks from physical disk/network isolation.

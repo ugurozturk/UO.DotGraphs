@@ -1,154 +1,94 @@
-# Gerçekleşen durum
+# Phase 5 — Bounded context and graph export
 
-Son güncelleme: 2026-10-09.
+Recorded **2026-10-09**. Phase 5 passed its macOS ARM64 delivery acceptance;
+Phases 6–11 had not started. Prior evidence: [Phase 4](PHASE4.md); current status:
+[STATUS](../STATUS.md). Existing workspace/trust/identity/query contracts and AGENTS
+were preserved.
 
-**Faz 5, aşağıdaki macOS ARM64 context/export kabul kapsamında tamamlandı.**
-Faz 6–11 başlamadı. [Faz 4 kanıt kaydı](PHASE4.md) arşivlendi.
-Önceki workspace, kimlik, trust/SDK/assets, semantik ilişki ve graph query
-sözleşmeleri korunuyor. AGENTS.md değiştirilmedi.
+## Delivered scope
 
-## Uygulananlar
+Context resolves exact IDs/names, then bounded literal lexical candidates over at
+most 10000 entities. Even one lexical candidate requires selection (exit 7); missing
+symbols return exit 8. It includes nearby edges, caller/callee and confidence
+summaries, source locations, limitations, and suggested queries.
 
-- `uographs context <symbol-id-or-text> --max-chars <n> --format json`.
-  Önce exact ID/ad; sonra en fazla 10000 entity üzerinde literal lexical arama.
-  Lexical aday tek olsa da seçilmez; aday seçimi exit 7, bulunamayan sembol exit 8.
-- Seçilen sembol, yakın ilişkiler, caller/callee özeti, dosya:satır/sütun/hash
-  konumları, inferred/unresolved sayımları ve uyarılar, sonraki sorgu önerileri.
-  Inferred/exact ayrımı ve unresolved null hedefleri korunur.
-- Depth/node/ilişki/çalışma/occurrence ve karakter bütçeleri. Bütün JSON stdout,
-  escape karakterleri, sayacın kendisi ve son LF Unicode scalar value olarak
-  ölçülür. Token sayısı iddiası yoktur. Kayıtlar bütün olarak budanır; geçerli JSON,
-  `truncated`, nedenler ve seçilen sembol korunur. Minimum envelope'a yetmezse
-  gerekli boyutu bildiren stderr, exit 2 ve boş stdout.
-- Kaynak metni varsayılan kapalı. `--include-source`: en fazla 3 C# snippet,
-  her biri 12 satır/1200 karakter; dosya en fazla 1 MiB. Secret/config/generated,
-  root dışı ve symlink yolları dışlanır. Decoded kaynak hash'i snapshot'a uymuyorsa
-  metin verilmez; missing/exclusion/mismatch durumları görünürdür. Kaynak yorumları
-  ve repository kaynaklı veriler açıkça güvenilmeyen veri olarak etiketlenir.
-- `uographs export --format json|ndjson|mermaid|dot`; `--symbol <id-or-exact-name>`
-  ile seçili altgraph ve `--depth` sınırı. Full graph export da açık node/edge/
-  occurrence limitlerine tabidir; kesilme saklanmaz.
-- Dört formatta kimlik, kanıt, confidence, analysis context ve eksikler korunur.
-  Mermaid/DOT'ta orijinal veriler JSON yorumları içinde yer alır. Deterministik
-  alias/ID sırası, label escaping, Unicode; unresolved için sahte hedef yoktur.
-- Context/export format v1, ürün 0.5.0. Query/index JSON v4 ve SQLite schema 3
-  değişmedi. Yeni paket/katman/LLM/embedding/uzak servis/renderer yok. Context
-  bütün graph'ı yüklemez; bounded SQL + tek read-only transaction kullanır.
+Whole-stdout Unicode-scalar budgeting includes JSON escapes, the counter, and final
+LF. Whole-record pruning retains valid JSON, selection, uncertainty, and truncation;
+minimum-envelope failure returns empty stdout/exit 2. No token-count claim.
 
-Tam komut, bütçe, kaynak ve format sözleşmesi: [CONTEXT-EXPORT](../CONTEXT-EXPORT.md).
-Önceki sorgular: [QUERIES](../QUERIES.md); semantik kapsam: [RELATIONSHIPS](../RELATIONSHIPS.md).
+Opt-in source text allows at most three C# snippets, 12 lines/1200 characters each,
+1 MiB/file, with secret/config/generated/outside-root/symlink exclusions and decoded
+hash matching. Mismatch/missing/exclusion remains explicit; source is untrusted data.
+Export supports JSON/NDJSON/Mermaid/DOT, focused subgraphs, bounds, deterministic
+aliases/escaping, and full evidence/context in diagram JSON comments. No invented
+unresolved target or unrestricted full-graph promise.
 
-## Gerçek doğrulama
+Product **0.5.0**, delivery **1**, query/index JSON **4**, SQLite **3**. No new layer,
+package, LLM, remote service, or renderer. Read-only transactions use bounded SQL.
+Current details: [CONTEXT-EXPORT](../CONTEXT-EXPORT.md).
 
-Ortam: macOS 27.0 ARM64 / osx-arm64, SDK **10.0.201**, MSBuild **18.3.0**,
-runtime **10.0.5**, Roslyn assembly **5.0.0.0**.
+## Recorded verification
 
-| Gerçek komut/kontrol | Sonuç |
+macOS 27.0 ARM64, SDK 10.0.201, MSBuild 18.3.0, runtime 10.0.5, Roslyn 5.0.0.0.
+
+| Command/check | Result |
 | --- | --- |
-| `dotnet --info` | PASS, exit 0; yukarıdaki kurulu sürümler. |
-| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, son kaynaklarla exit 0; **0 warning/error**, 5.30 saniye. |
-| `dotnet test UO.Graphs.slnx --no-build --no-restore -m:1 -nr:false` | PASS, son kaynaklarla exit 0; **69 integration + 10 unit = 79/79**, skipped 0; integration 2 dk 5 sn, unit 819 ms. |
-| `python3 scripts/audit_licenses.py --check` | PASS, exit 0; 50 kilitli paket, MIT/Apache-2.0/SQLite public domain. Yeni paket yok. |
-| Kaynak whitespace, XML/JSON/Python syntax ve Markdown dosya bağlantıları | PASS, exit 0; 96 kaynak/config/belge dosyası, güncel belgeler ve yeni arşiv bağlantıları. |
-
-Gerçek index/smoke komutları:
+| `dotnet --info` | PASS |
+| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, 5.30 s, 0 warnings/errors |
+| `dotnet test UO.Graphs.slnx --no-build --no-restore -m:1 -nr:false` | PASS **79/79**: 10 unit + 69 integration, zero skipped; 819 ms / 2m5s |
+| `python3 scripts/audit_licenses.py --check` | PASS, 50 packages |
+| Whitespace/XML/JSON/Python/local links | PASS, 96 files |
 
 ```sh
 dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --trust-project --allow-generators --db .uographs/phase5-smoke.db
 python3 scripts/phase5_smoke.py --db .uographs/phase5-smoke.db
 ```
 
-İkisi de **PASS / exit 0**. Roslyn → SQLite snapshot:
-`20bc3d8ec952431a9834fc705d0cf993`; **15 entity, 20 ilişki, 23 occurrence**,
-completeWithinDeclaredScope. Script ayrı gerçek CLI proseslerinde **17 çağrı**
-yaptı; runtime restore/index/download yapmadı. Exit 2/7/8 negatif akışları beklenen
-kodları verdi; diğerleri exit 0. Sorgu öncesi/sonrası DB SHA-256 aynı.
+Both exit 0. Snapshot `20bc3d8ec952431a9834fc705d0cf993`, **15 / 20 / 23**,
+completeWithinDeclaredScope. The script made **17 real CLI calls**; expected
+negative exits 2/7/8 were separate from successes. It did no runtime acquisition or
+indexing. Database SHA-256 was unchanged by reads.
 
-## Ölçülen context azalması
+## Measured context reduction
 
-Aynı görev: **Greet'i kim çağırıyor; statik caller ve kaynak konumu nedir?**
-Tam JSON export ve context aynı snapshot'tan okundu. Tam export'ta
-`truncated: false`; node/ilişki/occurrence sayıları status ile karşılaştırıldı.
-Her iki çıktıda aynı **Welcome → Greet CALLS**, occurrence ID, dosya/satır/hash ve
-gerekçe bulundu. Bu gerçek ürün CLI çalışmasıdır; graph HelloGraph örneğidir.
+Task: identify Greet's static caller and source evidence. Full export and context
+used the same snapshot and retained the same Welcome → Greet edge, occurrence ID,
+source range/hash, and reason. Full export was untruncated and counts matched status.
 
-| Ölçü | Tam graph JSON export | Context (`--max-chars 12000`) |
-| --- | --- | --- |
-| Bütün stdout karakteri, son LF dahil | **61.420** | **9.547** |
-| UTF-8 byte | **61.420** | **9.547** |
-| Aynı görev kanıtı | Var | Var |
+| Measurement | Full JSON graph | Context at max-chars 12000 |
+| --- | ---: | ---: |
+| Entire stdout characters, including LF | 61,420 | 9,547 |
+| UTF-8 bytes | 61,420 | 9,547 |
 
-Gerçek karakter azalması: `100 × (1 − 9547/61420)` = **%84,46**.
-Bu oran yalnızca bu snapshot/görev/içerik için ölçüldü; büyük repository veya token
-azalması iddiası değildir. JSON escaping nedeniyle bu çıktılarda byte/karakter eşit.
+Reduction: `100 × (1 − 9547/61420)` = **84.46%**, only for this fixture/task/output,
+not general repository or token savings. A 6500 budget produced 5531 characters,
+valid JSON and maxChars truncation. Budget 1 returned exit 2/empty stdout.
+Opt-in matched/untrusted source produced 10,038 characters. Evidence:
+`.uographs/phase5-evidence/measurement.json`, full-graph.json, context.json, and four
+greet-subgraph files. The directory is ignored.
 
-Ek CLI bütçe kontrolü: `--max-chars 6500` → **5531** karakter, geçerli JSON,
-`truncated: true` ve `maxChars`. `--max-chars 1` → **exit 2**, boş stdout,
-minimum envelope açıklaması. Default snippet yok; `--include-source` ile gerçek
-Greet dosyası hash-match ve untrusted etiketiyle **10038** karakterlik çıktı verdi.
+## Coverage and limits
 
-Ölçüm ve çıktılar yerel `.uographs/phase5-evidence/` içinde:
-`measurement.json`, `full-graph.json`, `context.json`, dört `greet-subgraph.*`.
-Smoke script bunları yeniden üretir; `.uographs` Git ignore kapsamındadır.
+Twenty new integration cases (7 Fact + 13 negative option Theory) retained all 59
+previous cases. Tests covered budgets 1/2000/3500/5000/8000/12000/50000, exact boundary
+and counter, selection/ambiguity, cycle/diamond and all bounds, confidence summaries,
+four-format parse/escaping/Unicode/ordering/DB preservation, default source omission,
+real source mismatch, path/privacy/large-file exclusions, 1200-emoji boundaries,
+10000-entity scan limit, corrupt selected/unrelated rows, old schema refusal, and
+invalid options before DB access. Initial focused 18/18 preceded final 79/79.
+No build/test/smoke failure; no weakened assertions. A newline check encountered
+existing lock files without final LF; they were preserved and JSON parsing retained.
 
-## Kabul testlerinin kapsamı
+Windows/Linux, physical offline, installed package, Release JIT, large-solution
+performance/memory, and external Mermaid/DOT visual rendering were NOT RUN.
+Snippet hash matching was not global freshness (then notChecked). The path policy
+was not a hardcoded-secret scanner; NDJSON was not unlimited streaming. Git metadata
+was absent (status 128), so diff was NOT RUN; file checks passed. No commit/push/publish.
 
-Yeni **20** integration vaka (7 Fact + 13 negatif seçenek Theory):
+## Changed files
 
-- 1/2000/3500/5000/8000/12000/50000 bütçeler, minimum envelope hatası, bütün stdout
-  sayacının eşitliği, exact bütçe sınırı, valid JSON, selected/completeness korunması.
-- Exact ID/ad önceliği; overload ambiguity ve limit 1; tek/çok lexical adayda
-  otomatik seçim yapılmaması, bulunamayan sembol, sorgu önerisi.
-- Cycle/diamond, node/ilişki/depth/çalışma/occurrence sınırları; inferred ve
-  unresolved gerekçe/null target; caller/uncertainty özetleri; tam export sayıları.
-- JSON/NDJSON ve Mermaid/DOT JSON yorumlarının parse edilmesi, seçilen düğüm/kanıt
-  kümeleri; tırnak, slash, newline, kontrol karakteri, Türkçe/CJK/emoji escaping.
-- Dört formatta gerçek ayrı CLI proseslerinde byte-stable tekrar, DB byte koruması;
-  ters record insertion sırasıyla aynı export; dört formatta truncation metadata'sı.
-- Varsayılan context/dört export formatında kaynak marker'ının bulunmaması;
-  yalnızca açık include-source ile kaynak/yorum verisi ve untrusted etiketi.
-- Gerçek dosya düzenlemesi sonrası CLI `snapshotMismatch` ve kaynak metninin
-  kaldırılması; missing, secret/config/gizli/bin, outside-root, generated, root
-  unavailable, symlink ve büyük dosya dışlaması. 1200 emoji sınırında surrogate
-  pair bölünmemesi. Normal hash-match snippet ve stale: notChecked ayrımı.
-- 10000 entity lexical scan sınırı; unrelated corrupt satırı deserialize etmeme,
-  seçili bozuk graph'ta exit 6; eski schema için exit 4 ve migration yapılmaması.
-- Geçersiz format/seçenek/sınırların DB açılmadan reddi. Önceki **59** test korunur.
+Added Core GraphDelivery/DeliveryWriter/SourceSnippets, Storage GraphDelivery,
+Phase5Tests, phase5_smoke.py, CONTEXT-EXPORT and Phase4 history. Updated CLI,
+version/indexer, README, PRODUCT, ARCHITECTURE, and STATUS.
 
-Ara koşu: ilk yeni 18 vaka odaklı test komutuyla **18/18** geçti; son iki vaka ve
-bütçe budamasındaki toplu kayıt çıkarma iyileştirmesinden sonra yukarıdaki tam
-**79/79** koşusu yapıldı. Başarısız build/test/smoke yok; assertion gevşetilmedi.
-İlk statik kontrol mevcut `packages.lock.json` dosyalarında final newline olmamasına
-takıldı. Lock dosyaları değiştirilmedi; JSON parse doğrulaması korundu, newline/
-whitespace kontrolü kaynak/config/belge dosyalarına uygulandı.
-
-## Sınırlar / NOT RUN
-
-- Windows/Linux build/test/CLI: **NOT RUN**; bu kabul macOS ARM64 kapsamındadır.
-- Ağ gerçekten kesilmiş offline kabul, kurulu tool paket kabulü, Release JIT,
-  büyük solution süre/bellek ölçümü: **NOT RUN**, Faz 11 yerine sayılmaz.
-- Harici Mermaid/DOT renderer/browser üzerinde görsel kabul: **NOT RUN**.
-  Üretim komutları renderer gerektirmez; escaping/Unicode/parse/sıra testleri geçti.
-- Hash kontrolü yalnızca opt-in snippet dosyasının okunan decoded içeriğini doğrular.
-  Genel snapshot freshness/incremental indexing yok; `stale: notChecked` korunur.
-- Dosya gizlilik politikası izinli normal C# dosyasındaki keyfi hardcoded secret'ı
-  tespit eden içerik tarayıcı değildir. Graph metadata'sı da hassas olabilir.
-  Kullanıcının başka ajana aktarımı ürünün yerel çalışma sınırından ayrıdır.
-- Tam export da sınırlıdır; `truncated` kontrol edilmelidir. NDJSON sınırsız
-  streaming/bellek garantisi değildir. Context ham compiler diagnostic'lerini
-  sayıya indirger; ayrıntıları status/export'ta kalır.
-- Git metadata yok; başlangıç `git status --short` exit 128. Git diff kontrolü
-  **NOT RUN**; kaynak/belge kontrolleri yapıldı. Commit/push/publish yapılmadı.
-
-## Değişen dosyalar
-
-- Yeni Core: `src/UO.Graphs.Core/GraphDelivery.cs`, `DeliveryWriter.cs`, `SourceSnippets.cs`.
-- Yeni Storage: `src/UO.Graphs.Storage.Sqlite/GraphDelivery.cs`.
-- CLI: `src/UO.Graphs.Cli/Program.cs` (iki komut, seçenek doğrulama, help/stdout).
-- Sürüm: `Directory.Build.props`, `src/UO.Graphs.Roslyn/ProjectIndexer.cs` (0.5.0).
-- Test: yeni `tests/UO.Graphs.IntegrationTests/Phase5Tests.cs`.
-- Smoke: yeni `scripts/phase5_smoke.py`.
-- Belgeler: yeni `docs/CONTEXT-EXPORT.md`, `docs/history/PHASE4.md`;
-  `README.md`, `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/STATUS.md`.
-
-Önerilen commit: `feat: add bounded AI context and deterministic graph exports`
+Suggested commit: `feat: add bounded AI context and deterministic graph exports`

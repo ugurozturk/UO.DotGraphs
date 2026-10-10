@@ -1,59 +1,43 @@
-# Gerçekleşen durum
+# Phase 8 — Mediator and messaging flows
 
-Son güncelleme: 2026-10-09.
+Recorded **2026-10-09**. Phase 8 passed its macOS ARM64 static acceptance; Phases
+9–11 had not started. Product **0.8.0**; JSON 4 / SQLite 3 / delivery 1 unchanged.
+Prior evidence: [Phase 7](PHASE7.md); current: [STATUS](../STATUS.md).
+No broker, host, DI container, network service, or mediator runtime was started.
 
-**Faz 8, aşağıdaki macOS ARM64 statik messaging kabul kapsamında tamamlandı.**
-Faz 9–11 başlamadı. Ürün **UO.Graphs 0.8.0**, CLI **uographs**.
-Önceki [Faz 7 kanıtı](PHASE7.md) arşivlendi.
-Broker, ağ servisi, application host, DI container veya mediator runtime başlatılmadı.
+## Delivered scope
 
-## Uygulananlar
+Actual UO.Mediator sources and UO.Mediator.Shared **2.4.2**, MediatR **12.4.1** /
+Contracts **2.0.1**, and MassTransit.Abstractions **8.3.6** DLL/tag sources established
+API/assembly binding. These permissive dependencies are fixtures, not product
+packages. No nonexistent UO notification/Publish API was invented.
 
-- Gerçek UO.Mediator repository sözleşmesi ve **UO.Mediator.Shared 2.4.2** paketi
-  incelendi: `IRequestDispatcher.DispatchAsync`, `HandleAsync`, Unit/no-response,
-  `IRequestBehavior` / `RequestHandlerNext`. UO için olmayan notification/Publish
-  API'si uydurulmadı.
-- **MediatR 12.4.1 / MediatR.Contracts 2.0.1** ve **MassTransit.Abstractions 8.3.6**
-  gerçek paket + tag kaynakları incelendi; API/assembly binding ile modüller eklendi.
-  Bunlar permissive lisanslı fixture bağımlılıklarıdır; ürün paketleri değişmedi.
-- HANDLES, DISPATCHES, PUBLISHES, CONSUMES, POSSIBLE_TARGET,
-  BEHAVIOR_FOR, POSSIBLE_BEHAVIOR. CALLS compile-time anlamını korur.
-- Mesaj entity kimliği framework, gerçek assembly/declaration/source-context ve
-  recursive closed generic arguments ile belirlenir. Aynı adlı farklı namespace/
-  assembly mesajlar ve `Request<int>` / `Request<string>` karışmaz.
-- Exact API/sözleşme ile inferred handler/consumer adayları ayrıdır. Runtime seçim
-  ayrıca unresolved kalır; publish tek consumer garantisi vermez. Kayıt bulunmaması
-  veya başka servisteki consumer'ın görülmemesi yokluk kanıtı sayılmaz.
-- Generic doğrudan Microsoft DI kayıtları aday ilişkiye ayrı kaynak occurrence'ı
-  ekler; conditional kayıt belirsizliği korunur. Scanning/topology/container execution
-  çözülmez. Closed behavior ayrı adaydır; open generic substitution ve sıra unresolved.
-- Mevcut SQLite transaction/payload, query path/dependencies/impact ve context/export
-  yeni metadata/ilişkileri korur. JSON v4 / SQLite 3 / delivery 1 değişmedi.
-- Gerçek paket fixture'ları ve kaynak contract fixture'ları ayrı tutuldu; eşdeğer
-  flow shape testi gerçek DLL testinin yerine geçmez.
+HANDLES/DISPATCHES/PUBLISHES/CONSUMES/POSSIBLE_TARGET/BEHAVIOR_FOR/POSSIBLE_BEHAVIOR
+separate exact contracts from inferred candidates and unresolved runtime selection.
+Closed message identity includes framework, assembly/declaration/source context,
+and recursive generic arguments, separating equal names and constructed messages.
+CALLS remains compile-time. Direct generic DI registration adds distinct occurrence
+evidence without proving activation; scanning/topology/behavior order stay unknown.
+SQLite/query/context/export preserve everything. Source-contract fixtures remain
+separate from actual-package compatibility. See [MESSAGING](../MESSAGING.md).
 
-Tam sözleşme, kaynaklar ve destek sınırları: [MESSAGING](../MESSAGING.md).
+## Recorded verification
 
-## Gerçek doğrulama
+macOS 27.0 ARM64, SDK 10.0.201, MSBuild 18.3.0, runtime/reference pack 10.0.5,
+Roslyn 5.0.0.0; dotnet --info passed.
 
-macOS 27.0 ARM64 / osx-arm64, SDK **10.0.201**, MSBuild **18.3.0**,
-.NET runtime/reference pack **10.0.5**, Roslyn **5.0.0.0**.
-
-| Gerçek komut/kontrol | Sonuç |
+| Command/check | Result |
 | --- | --- |
-| `dotnet --info` | PASS; ortam yukarıda. |
-| `dotnet restore samples/Phase8/Uo/Uo.csproj --ignore-failed-sources -p:NuGetAudit=false -m:1 -nr:false` | PASS; gerçek cache UO paketi. |
-| `dotnet restore samples/Phase8/PackageCompatibility/PackageCompatibility.csproj --ignore-failed-sources -p:NuGetAudit=false -m:1 -nr:false` | PASS; gerçek MediatR/MassTransit paketleri edinildi. |
-| `dotnet restore UO.Graphs.slnx --locked-mode --ignore-failed-sources -m:1 -nr:false -p:NuGetAudit=false` | PASS exit 0; development restore, runtime edinimi değil. |
-| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS exit 0, **0 warning / 0 error**, son koşu 6.08 sn. |
-| Unit TRX koşusu | PASS exit 0, **35/35**, yaklaşık 4 sn. |
-| İki yeni messaging integration TRX koşusu | PASS exit 0, **2/2**, yaklaşık 14 sn. |
-| Tüm integration regresyonları | PASS exit 0; **84/84**, **10 dk 57 sn**. |
-| `python3 scripts/phase8_smoke.py` | PASS exit 0; doğrudan oluşturulan iki gerçek paket graph'ı üzerinde **7 ayrı CLI proses**, altı adımlı path/context/export. |
-| `python3 scripts/audit_licenses.py --check` | PASS exit 0; **55** kilitli paket, MIT/Apache-2.0/doğrulanmış SQLite public domain. |
-| Kaynak/config parse, whitespace, yerel Markdown bağlantıları | PASS exit 0; **138** kaynak/config/belge dosyası. |
-
-Gerçek test komutları:
+| `dotnet restore samples/Phase8/Uo/Uo.csproj --ignore-failed-sources -p:NuGetAudit=false -m:1 -nr:false` | PASS, actual cached UO package |
+| Same restore flags for samples/Phase8/PackageCompatibility/PackageCompatibility.csproj | PASS, actual MediatR/MassTransit acquired |
+| `dotnet restore UO.Graphs.slnx --locked-mode --ignore-failed-sources -m:1 -nr:false -p:NuGetAudit=false` | PASS, explicit development acquisition |
+| `dotnet build UO.Graphs.slnx --no-restore -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, final 6.08 s, 0 warnings/errors |
+| Unit TRX | PASS **35/35**, about 4 s |
+| Focused messaging integration TRX | PASS **2/2**, about 14 s |
+| Full integration TRX | PASS **84/84**, 10m57s |
+| `python3 scripts/phase8_smoke.py` | PASS, seven separate CLI processes on two real package graphs |
+| `python3 scripts/audit_licenses.py --check` | PASS, **55** packages |
+| Config/whitespace/local links | PASS, 138 files |
 
 ```sh
 dotnet test tests/UO.Graphs.UnitTests --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit-final.trx' --results-directory .uographs/phase8-tests
@@ -61,83 +45,61 @@ dotnet test tests/UO.Graphs.IntegrationTests --no-build --no-restore -m:1 -nr:fa
 dotnet test tests/UO.Graphs.IntegrationTests --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=integration-final.trx' --results-directory .uographs/phase8-tests
 ```
 
-Son binary ile **35 unit + 84 integration = 119 ayrı vaka** geçti. TRX XML sayaçları
-ayrıca okundu: failed/error/notExecuted=0. İki messaging vakası ayrıca odaklı koşuldu;
-toplama ikinci kez eklenmedi.
+**119 distinct final-binary cases** passed, with zero failed/error/notExecuted in
+TRX; the repeated two messaging cases were not counted twice. Ten new unit/two
+integration cases covered actual packages, response/no-response, chained dispatch,
+multiple notifications/consumers, pipeline/open generics, conditional registration,
+object/computed/explicit Type, interface initializers, same-named identities,
+lookalikes, and compilation errors. Existing tests remained.
 
-10 yeni unit vaka ve iki yeni integration vaka vardır. Önceki testler korunur;
-central ilişki yönü testi yeni yedi yönü de sabitler. Gerçek package compilation,
-response/no-response, A→B dispatch, çoklu notification/consumer, pipeline, açık generic,
-conditional registration, object/computed Type, explicit typeof ve interface initializer,
-aynı isimli farklı namespace/assembly, lookalike ve compilation error sınanır.
+## Real CLI smoke
 
-## Gerçek CLI smoke
+Prefix: `dotnet run --project src/UO.Graphs.Cli --no-build --no-restore --`.
 
-Doğrudan indeksleme için gerçek önek:
-`dotnet run --project src/UO.Graphs.Cli --no-build --no-restore --`.
-
-| Gerçek argümanlar | Sonuç |
+| Arguments | Result |
 | --- | --- |
-| `index samples/Phase8/Uo/Uo.csproj --full --trust-project --db .uographs/phase8-direct-uo.db` | exit 0; **43 entity / 198 relationship / 260 occurrence**. |
-| `index samples/Phase8/PackageCompatibility/PackageCompatibility.csproj --full --trust-project --db .uographs/phase8-direct-packages.db` | exit 0; **44 entity / 219 relationship / 279 occurrence**. |
+| `index samples/Phase8/Uo/Uo.csproj --full --trust-project --db .uographs/phase8-direct-uo.db` | exit 0; **43 / 198 / 260** |
+| `index samples/Phase8/PackageCompatibility/PackageCompatibility.csproj --full --trust-project --db .uographs/phase8-direct-packages.db` | exit 0; **44 / 219 / 279** |
 
-Query smoke betiği `dotnet src/UO.Graphs.Cli/bin/Debug/net10.0/uographs.dll` ile
-ayrı prosesler açar. Tam komut dizileri/exit code'lar `.uographs/phase8-evidence/commands.json`;
-status, path, context, iki tam export ve event dependencies JSON dosyaları aynı dizindedir.
-Export'larda truncation=false; UO 5, diğer paketler 7 ayrı mesaj entity'si üretir.
-
-Path'in gerçek ilişkileri:
+Separate direct-DLL query processes recorded commands/exits in
+`.uographs/phase8-evidence/commands.json`, with status/path/context/export/event
+results. Exports were untruncated: five UO and seven other-package message entities.
 
 ```text
 GET /phase8/start → FlowController.Start → Service.Run
-  → RequestA message → HandlerA.HandleAsync → RequestB message → HandlerB.HandleAsync
-HANDLED_BY(exact), CALLS(exact), DISPATCHES(exact), POSSIBLE_TARGET(inferred),
-DISPATCHES(exact), POSSIBLE_TARGET(inferred)
+  → RequestA → HandlerA.HandleAsync → RequestB → HandlerB.HandleAsync
+HANDLED_BY exact, CALLS exact, DISPATCHES exact, POSSIBLE_TARGET inferred,
+DISPATCHES exact, POSSIBLE_TARGET inferred
 ```
 
-Inferred opt-in olmadan bu edge policy ile path bulunmaz; integration testi bunu da
-sınar. Context aynı zinciri, kaynak kanıtlarını ve harici consumer kapsamını taşır.
-MediatR Event için First/Second, MassTransit Event için Consumer1/Consumer2 iki ayrı
-inferred hedeftir; her mesajın unresolved runtime hedef kaydı da kalır.
+Without inferred opt-in this path was absent under the selected edge policy.
+Context retained the same chain/source evidence and external-consumer limitations.
+MediatR had First/Second and MassTransit Consumer1/Consumer2 as separate inferred
+targets while each unresolved runtime-target record remained.
 
-UO snapshot: `ef7d776004ec4287ae6e82b8f89153ba`.
-Diğer paket snapshot: `c170d7275dc74ed8a51d98341383c241`.
-İkisi de **partial**; runtime belirsizlikleri ve generator politikası açıktır.
-Freshness **unknown**: custom item/external Compile girdileri nedeniyle Faz 6 reuse
-politikası kapalıdır. Bu faz freshness veya no-op garantisini genişletmez.
+Snapshots: UO `ef7d776004ec4287ae6e82b8f89153ba`, packages
+`c170d7275dc74ed8a51d98341383c241`. Both partial and freshness unknown due to runtime/
+generator/custom-item/external-input limitations; no broader reuse claim.
 
-## Ara başarısızlıklar ve sınırlar
+## Intermediate failures and boundaries
 
-- İlk `curl` paket indirme denemesi DNS çözümleyemedi (exit 6). Ardından açık
-  development `dotnet restore` başarılı oldu; paketler ve nuspec/lock'lar doğrulandı.
-- İlk unit koşusu 32/35, integration 0/2 idi: central yön listesi yeni enum'larla
-  genişletildi; yeni testlerde ters string assertion, relationship/occurrence ayrımı,
-  JSON options içindeki edge adı ve export'un desteklemediği max-chars kullanımı
-  düzeltildi. Üretim assertion'ı gevşetilmedi/test silinmedi; son koşular yukarıda.
-- Python tarafından stdout/stderr yakalanan ilk index, workspace yüklemede timeout
-  ile exit 5 verdi. Aynı fixture'ların doğrudan terminal index'leri exit 0; query
-  smoke mevcut bu DB'lerde geçti. Bu ortam/invocation farkı giderilmiş sayılmaz.
-- Windows/Linux, paketlenmiş tool, ağ fiziksel olarak kapalı offline kabul ve büyük
-  solution performansı **NOT RUN**. Runtime broker/host teslim testi bilinçli kapsam dışı.
-- Concrete dispatcher/custom extension/stream API, open generic substitution,
-  registration scanning ve MassTransit topology expansion kapsam dışıdır.
-  Destek yalnız belirtilen paket sürümleri ve [matris](../MESSAGING.md) içindir.
-- `git status --short` exit 128: checkout'ta Git metadata yok. Git diff **NOT RUN**;
-  dosya tabanlı kontroller uygulanır. AGENTS.md değiştirilmedi; commit/push/publish yok.
+Initial curl acquisition failed DNS (exit 6); explicit dotnet restore later passed.
+Initial unit 32/35 and integration 0/2 failures exposed central enum-list and test
+expectation/options issues; tests were corrected without removing behavior checks.
+Python-captured indexing timed out exit 5; direct fixture indexes and subsequent
+read smoke passed separately.
 
-## Değişen dosyalar
+Windows/Linux, installed tool, physical offline, and large-scale performance were
+NOT RUN. Concrete dispatchers/wrappers/streams, generic substitution, scanning,
+and topology expansion remained outside support. Git status 128 reflected absent
+metadata; diff NOT RUN, file checks passed. No AGENTS edit or commit/push/publish.
 
-- Core: `GraphSnapshot.cs`, `Relationships.cs`, `GraphQuery.cs`.
-- Roslyn: yeni `Frameworks/MessagingExtractor.cs`; `Frameworks/FrameworkExtraction.cs`,
-  `ProjectIndexer.cs`. CLI: `Program.cs` sürüm bilgisi.
-- Config: `Directory.Build.props`, `Directory.Packages.props`, `UO.Graphs.slnx`;
-  restore'un güncellediği ilgili lock dosyaları.
-- Yeni fixture'lar: `samples/Phase8/Uo`, `PackageCompatibility`, `Contracts`,
-  `ContractFixtures/MediatR`, `ContractFixtures/MassTransit`; kaynak provenance/lisanslar.
-- Test: yeni `MessagingTests.cs`, `Phase8Tests.cs`; `RelationshipTests.cs` yön tablosu.
-- Script: yeni `scripts/phase8_smoke.py`; `scripts/audit_licenses.py` envanter başlığı.
-- Belge: yeni `docs/MESSAGING.md`, `docs/history/PHASE7.md`; `README.md`,
-  `docs/PRODUCT.md`, `ARCHITECTURE.md`, `RELATIONSHIPS.md`, `QUERIES.md`, `STATUS.md`,
-  `DEPENDENCIES.md`, `THIRD-PARTY-NOTICES.txt`.
+## Changed files
 
-Önerilen commit: `feat: model mediator and messaging flows with semantic evidence`
+Core graph/relationships/query; new MessagingExtractor and extractor/indexer wiring;
+CLI/version/central package/solution/locks; Phase8 package and source-contract fixtures
+with provenance/licenses; MessagingTests/Phase8Tests/direction assertions;
+phase8_smoke.py/audit header; MESSAGING, Phase7 history, README/PRODUCT/ARCHITECTURE/
+RELATIONSHIPS/QUERIES/STATUS/DEPENDENCIES/notices.
+
+Suggested commit: `feat: model mediator and messaging flows with semantic evidence`

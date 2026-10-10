@@ -1,100 +1,84 @@
-# Gerçekleşen durum
+# Phase 1 — Local Roslyn-to-SQLite skeleton
 
-Son güncelleme: 2026-10-08.
+Recorded **2026-10-08**. This is historical evidence for Phase 1, not the current
+feature/version matrix. See [STATUS](../STATUS.md) for later results.
 
-## Tamamlananlar
+Phase 1 passed its narrow macOS ARM64 end-to-end acceptance. Phases 2–11 had not
+started. There was no application or Git repository initially; Git was not
+initialized, and existing .DS_Store/user files and AGENTS.md were preserved.
 
-**Faz 1, macOS ARM64 üzerindeki dar uçtan uca kabul kapsamında tamamlandı.**
-Faz 2–11 başlamadı; geniş sembol/ilişki, incremental index ve tool paketleme uygulanmadı.
-Hazırlık/Faz 0 belgeleri korunuyor. Başlangıçta uygulama kodu ve Git deposu yoktu;
-Git başlatılmadı, mevcut `.DS_Store` dosyaları ve `AGENTS.md` değiştirilmedi.
+## Delivered scope
 
-- Core: gerçek snapshot, proje bağlamı, varlık, kaynak kanıtı ve confidence sözleşmeleri.
-- Roslyn: güven kapısı → kurulu SDK/var olan assets → gerçek MSBuildWorkspace →
-  project/type/method tanımları. Proje referansları yüklenir; otomatik restore yoktur.
-- SQLite: schema v1, tek snapshot, atomik transaction, salt okunur sorgu/status;
-  başarısız analizde eski snapshot korunur, yazma hatasında rollback yapılır.
-- CLI: `--help`, `doctor`, `index ... --trust-project`, `status`, `query find ... --format json`,
-  `--db`. JSON stdout, ilerleme/hata stderr. Çıkış kodları ve JSON v1 README'de.
-- .NET 10.0.201 / C# 14 / nullable / merkezi paketler / sekiz lock dosyası / editorconfig.
-- İki test projesi ve gerçek iki projeli `samples/HelloGraph/HelloGraph.slnx`.
-- MIT ürün lisansı; 42 doğrudan/geçişli paketin gerçek nuspec lisans kontrolü,
-  native SQLite lisans dosyası ve upstream bildirimleri kaydedildi.
-- `.uographs/`, build çıktıları, SQLite DB/yan dosyaları Git dışında tutulacak biçimde ayarlandı.
+- Core snapshot/project/entity/source/confidence contracts.
+- Trust gate → installed SDK/existing assets → real MSBuildWorkspace → project,
+  type, and method declarations, including project-reference loading without restore.
+- SQLite schema 1, one snapshot, transactional replacement/rollback and read-only
+  query/status. Failed analysis preserved the previous snapshot.
+- CLI help, doctor, index with trust, status, literal find, JSON format, and db option.
+  JSON stdout and progress/error stderr; the then-current contract was JSON v1.
+- SDK 10.0.201, C# 14, nullable, central versions, eight locks, editorconfig,
+  two test projects, and the real two-project HelloGraph sample.
+- MIT product license and evidence for 42 locked direct/transitive packages,
+  native SQLite, and upstream notices. Build/SQLite/evidence outputs were ignored.
 
-## Gerçek doğrulama sonuçları
+## Recorded verification
 
-Ortam: macOS 27.0, ARM64 / `osx-arm64`; SDK `10.0.201`, MSBuild `18.3.0`, runtime `10.0.5`.
-Tüm CLI doğrulamaları gerçek `src/UO.Graphs.Cli/UO.Graphs.Cli.csproj` üzerinden
-`dotnet run --no-build --no-restore` ile yapıldı; kurulu tool varsayılmadı.
+macOS **27.0 ARM64/osx-arm64**, SDK **10.0.201**, MSBuild **18.3.0**, runtime **10.0.5**.
+CLI invocations used the source project through dotnet run, not an installed tool.
 
-| Komut/kontrol | Gerçek sonuç |
+| Command/check | Result |
 | --- | --- |
-| `dotnet --info` | PASS, exit 0: yukarıdaki kurulu SDK/runtime doğrulandı. |
-| `dotnet restore UO.Graphs.slnx --locked-mode -m:1 -nr:false` | PASS, exit 0: 8 proje; lock çözümlemesi değişmeden, NuGet uyarısı olmadan. Bu açık geliştirme restore adımıdır. |
-| `dotnet build UO.Graphs.slnx --no-restore -t:Rebuild -m:1 -nr:false -p:UseSharedCompilation=false` | PASS, exit 0: 8 proje yeniden derlendi; 0 warning, 0 error; 9.91 saniye. |
-| `dotnet test UO.Graphs.slnx --no-build --no-restore -m:1 -nr:false` | PASS, exit 0: 2 unit + 16 integration = 18/18; skipped 0. Integration yaklaşık 13 saniye. |
-| `dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --trust-project --db .uographs/smoke.db` | PASS, exit 0: 2 proje + 2 tip + 2 metot = 6 gerçek varlık. Snapshot `92b5d53237b74d22854c55495ee3c1e0`. |
-| Aynı CLI prefix'iyle `query find Greeter --format json --db .uographs/smoke.db` | PASS, exit 0: yeni proseste `T:HelloGraph.Domain.Greeter`, ad `Greeter`, aynı snapshot. |
-| Aynı CLI prefix'iyle `query find Greet --format json --db .uographs/smoke.db` | PASS, exit 0: başka yeni proseste `M:HelloGraph.Domain.Greeter.Greet(System.String)`, ad `Greet`, aynı snapshot. |
-| Aynı CLI prefix'iyle `status --db .uographs/smoke.db` | PASS, exit 0: 6 varlık / 2 proje; bağımsız JSON assertion'ları geçti. |
-| `--help`, `doctor`, `.csproj` input + ProjectReference, varsayılan `.uographs/graph.db` | PASS: integration testlerinde gerçek yeni CLI prosesleriyle doğrulandı. |
-| Güven bayrağı yok / hatalı argüman / eksik assets / eksik hedef SDK | PASS: sırasıyla exit 3 / 2 / 4 / 4, hata stderr, stdout boş; assets/DB oluşturulmadı. |
-| SQLite rollback | PASS: DELETE ve yeni analysis/ilk entity INSERT sonrasında duplicate PK hatası (SQLite code 19); bağlantı yeniden açıldığında eski analysis ve entity korundu. |
-| Başarısız yeniden index | PASS: gerçek geçerli index sonrasında assets eksik hedef index reddedildi; eski snapshot aynı kaldı. |
-| Kaynak/kimlik assertions | PASS: tip/metot adı, nitelikli ad, bağımsız SHA256 ile ID, projectId, documentationId, kaynak hash'i, konum, confidence ve snapshot kimliği. |
-| `python3 scripts/audit_licenses.py --check` | PASS, exit 0: 42 kilitli paket; MIT / Apache-2.0 / açıkça doğrulanan SQLite public domain. |
-| Python XML/son satır/boşluk kontrolü | PASS, exit 0: 8 csproj + 8 lock, proje/merkezi ayar XML'leri geçerli; kaynaklarda satır sonu boşluğu yok. |
+| `dotnet --info` | PASS exit 0; versions above |
+| `dotnet restore UO.Graphs.slnx --locked-mode -m:1 -nr:false` | PASS; eight projects, unchanged locks, no NuGet warnings |
+| `dotnet build UO.Graphs.slnx --no-restore -t:Rebuild -m:1 -nr:false -p:UseSharedCompilation=false` | PASS; 0 warnings/errors, 9.91 s |
+| `dotnet test UO.Graphs.slnx --no-build --no-restore -m:1 -nr:false` | PASS **18/18**: 2 unit + 16 integration, zero skipped; integration about 13 s |
+| `python3 scripts/audit_licenses.py --check` | PASS; 42 packages, MIT/Apache-2.0/verified SQLite public domain |
+| XML/newline/whitespace checks | PASS; eight csproj/eight locks and central configuration |
 
-Bu checkout için assertion ile bulunan kimlikler (mutlak proje yoluna bağlıdır):
+```sh
+dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- index samples/HelloGraph/HelloGraph.slnx --trust-project --db .uographs/smoke.db
+dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- query find Greeter --format json --db .uographs/smoke.db
+dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- query find Greet --format json --db .uographs/smoke.db
+dotnet run --project src/UO.Graphs.Cli/UO.Graphs.Cli.csproj --no-build --no-restore -- status --db .uographs/smoke.db
+```
 
-- `Greeter`: `4b75c2e8d37286a64a734e8a2c995c83c6e56ebcbcf37b3d40bcf8a3d915d08b`
-- `Greet(string)`: `3674fe5c1a3a67d7834e5ab3f74567b7a21358e1a1448eaaba49bf912ee3fabe`
+All passed with **6 entities** (two projects/types/methods), snapshot
+`92b5d53237b74d22854c55495ee3c1e0`. Separate processes found the expected type and
+Greet(string) documentation IDs and the same snapshot. Independent assertions
+checked SHA-256 IDs, project ownership, source hashes/ranges, names, and confidence.
+These old IDs depended on absolute project paths:
 
-## Karşılaşılan ve ayrıştırılan sorunlar
+- Greeter: `4b75c2e8d37286a64a734e8a2c995c83c6e56ebcbcf37b3d40bcf8a3d915d08b`
+- Greet(string): `3674fe5c1a3a67d7834e5ab3f74567b7a21358e1a1448eaaba49bf912ee3fabe`
 
-- İlk restore, eski geçişli `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 için NU1903 verdi.
-  Suppression eklenmedi; bundle 3.0.2 ve lisans dosyası olan native
-  `SourceGear.sqlite3` 3.50.4.5 sabitlendi. Son restore/build temiz.
-- İlk build MSBL001 verdi: MSBuild.Framework runtime asset'i Locator ile çakışıyordu.
-  İlgili projelerde `ExcludeAssets="runtime" PrivateAssets="all"` ayarlandı;
-  değerlendirme için hedefin kurulu SDK'sı kullanılıyor.
-- Normal paralel solution restore bu sandbox'ta ilerlemedi; iptal sinyali gönderildi.
-  Tek worker / node reuse kapalı restore ve rebuild başarılı oldu.
-- Python/shell sarmalayıcısıyla smoke denemeleri Roslyn build-host IPC zaman aşımı
-  (exit 5) verdi. Aynı ürünün doğrudan CLI index'i ve tam test koşusu başarılı.
-  Python smoke sarmalayıcısı teslim edilmedi; senaryo gerçek proses açan integration
-  testlerinde tutuldu. Bu denemeler başarılı offline kabul sayılmadı.
-- Ayrı filtreli test komutu:
-  `dotnet test tests/UO.Graphs.IntegrationTests/UO.Graphs.IntegrationTests.csproj --no-build --no-restore -m:1 -nr:false --filter FullyQualifiedName~RealSolutionIndexPersistsTypeAndMethodAcrossProcesses`
-  → **NOT RUN / test başlamadan engellendi**, exit 1: VSTest `SocketException (13): Permission denied`.
-  Aynı smoke testinin son tam solution koşusunda geçtiği ayrıca yukarıda kayıtlıdır.
-  Ortam izinleri aşılmadı, assertion veya test gevşetilmedi.
+Help/doctor, csproj with references, and default DB were checked in real processes.
+Missing trust/invalid arguments/missing assets/missing SDK returned 3/2/4/4 with
+empty stdout and no created assets/DB. Duplicate-PK SQLite code 19 after deletion/
+partial insertion rolled back to the old snapshot. Failed re-index preserved it.
 
-## Sınırlar / NOT RUN
+## Failures and boundaries
 
-- Windows ve Linux build/test/CLI çalıştırma: **NOT RUN**, bu ortam macOS.
-- Ağ fiziksel/işletim sistemi düzeyinde kapalıyken çalışma: **NOT RUN**.
-  Ürün restore/download/update çağırmıyor; eksik assets'te dosya yaratmadığı testli.
-  Bu kanıt, güven verilen custom MSBuild mantığının ağ kullanamayacağı anlamına gelmez.
-- Geniş gerçek dünya solution matrisi, multi-TFM, farklı configuration/SDK bağlamları,
-  source generators, ilişkiler ve güncellik takibi doğrulanmadı/uygulanmadı.
-- `coverage` yalnızca tanımlı Faz 1 kapsamıdır; `freshness` daima `notChecked`.
-  Kaynak değişimi sonrası eski snapshot'ın güncel olduğu iddia edilmez.
-- Tool paketlemesi/publish ve dağıtım platform matrisi yapılmadı.
-- Git repository'si yok; `git diff --check` uygulanamadı. Kaynak boşluk kontrolü ayrıca yapıldı.
+NU1903 on SQLitePCLRaw.lib.e_sqlite3 2.1.11 was resolved by pinned bundle 3.0.2 and
+SourceGear.sqlite3 3.50.4.5, not suppression. MSBL001 was resolved by excluding
+Microsoft.Build.Framework runtime assets and making them private. Parallel restore
+stalled in the sandbox; single-worker/no-reuse restore/rebuild passed.
 
-## Değişen dosyalar ve commit önerisi
+Python/shell-wrapped index attempts timed out in BuildHost (exit 5), while direct
+CLI and the full suite passed. No Python smoke wrapper was delivered. A separate
+filtered RealSolutionIndexPersistsTypeAndMethodAcrossProcesses test invocation
+aborted before execution with VSTest SocketException (13), exit 1; that same test
+passed inside the recorded full suite. Permissions/assertions were not bypassed.
 
-- Yeni: `UO.Graphs.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`,
-  `NuGet.Config`, `.editorconfig`, `.gitignore`, `LICENSE`, `README.md`.
-- Yeni: `src/UO.Graphs.{Core,Roslyn,Storage.Sqlite,Cli}/` proje/kaynak/lock dosyaları.
-- Yeni: `tests/UO.Graphs.{UnitTests,IntegrationTests}/` proje/test/lock dosyaları.
-- Yeni: `samples/HelloGraph/` iki proje, iki C# dosyası, solution ve lock dosyaları.
-- Yeni: `scripts/audit_licenses.py`, `docs/DEPENDENCIES.md`, `THIRD-PARTY-NOTICES.txt`.
-- Güncellendi: `docs/STATUS.md`, `docs/ARCHITECTURE.md` (gerçekleşen SDK/paket durumu).
+At this phase, Windows/Linux, physical offline, broad real-world/multi-TFM/config/
+generator matrices, relationships, freshness, packaging, and publication were
+**NOT RUN** or outside implemented scope. Freshness was always notChecked and
+coverage meant only Phase 1. Git diff was NOT RUN because no Git metadata existed;
+file-level checks were used instead. No commit/push/publish occurred in this run.
 
-Önerilen commit mesajı:
-`feat: implement phase 1 local Roslyn to SQLite CLI pipeline`
+## Changed files
 
-Commit/push/publish yapılmadı. Sonraki faz için kullanıcı talimatı beklenir.
+Added solution, SDK/central settings, NuGet.Config, editorconfig/gitignore, LICENSE,
+README, four product projects, two test projects, HelloGraph projects/sources/locks,
+audit_licenses.py, DEPENDENCIES, and THIRD-PARTY-NOTICES. Updated STATUS and ARCHITECTURE.
+
+Suggested commit: `feat: implement phase 1 local Roslyn to SQLite CLI pipeline`

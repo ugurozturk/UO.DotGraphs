@@ -1,72 +1,89 @@
 # Canonical identity v2
 
-Kimlikler snapshot, süreç, satır veya mutlak checkout yoluna bağlı değildir.
-`analysis.identityVersion = "2"`; her varlık `canonicalIdentity` değerini taşır.
-ID = canonical string'in BOM'suz UTF-8 byte'larının SHA-256 özeti, küçük harf hex.
+Declaration IDs are independent of snapshot, process, line number, and absolute
+checkout path. `analysis.identityVersion = "2"`; entities retain their
+`canonicalIdentity`. The ID is the lowercase hexadecimal SHA-256 of the canonical
+string's BOM-free UTF-8 bytes.
 
-`C(parts...) = "uographs:2:" + concat(UTF8ByteCount(part) + ":" + part)`.
-Uzunluk ondalıktır; Unicode normalize edilmez, harf duyarlılığı korunur.
-Örneğin `C("é", "a:b") = "uographs:2:2:é3:a:b"`.
-Delimiter içeren alanlar çakışmaz. SHA-256 teorik çakışma olasılığı sıfır kabul edilmez.
+```text
+C(parts...) = "uographs:2:" + concat(UTF8ByteCount(part) + ":" + part)
+C("é", "a:b") = "uographs:2:2:é3:a:b"
+```
 
-| Varlık | Canonical içerik |
+Lengths are decimal. Unicode is not normalized; case is preserved. Length prefixes
+avoid delimiter collisions. SHA-256 is not claimed to have zero theoretical
+collision probability.
+
+| Entity | Canonical input |
 | --- | --- |
 | project | `C("project", relativeProjectPath, targetFramework, configuration)` |
 | solution | `C("solution", relativeInputPath, configuration, selectedFrameworkOrDefault)` |
 | assembly | `C("symbol", projectId, "A:" + RoslynAssemblyIdentity)` |
 | namespace/type/member | `C("symbol", projectId, declarationKey)` |
 
-`relativeProjectPath`, `analysis.rootPath` altındaki göreli yoldur; `\` → `/`.
-`--root` verilirse input ve tüm projeleri içermelidir. Varsayılan, input klasörü
-ve ulaşılan projelerin ortak üst klasörüdür. Aynı repo farklı köke kopyalandığında
-aynı göreli yerleşim ve seçenekler aynı kimliği üretir. Farklı giriş altkümeleriyle
-karşılaştırma için aynı mantıksal `--root` seçilmelidir. Farklı bağımsız repolardaki
-aynı yerleşimi küresel olarak ayırma/federation bu fazın kapsamı değildir.
+Project paths are relative to `analysis.rootPath`, with backslashes normalized to
+`/`. An explicit `--root` must contain the input and all projects. The default is
+the common ancestor of the input directory and reached projects. Relocating the
+same layout with the same options preserves IDs. Use the same logical root when
+comparing different input subsets. This is not global multi-repository federation.
 
-Declaration key normal durumda Roslyn documentation comment ID'sidir:
+## Declaration keys
 
-- Namespace: `N:Fixture`; global namespace `N:`. Proje/TFM bağlamında ayrılır.
-- Tip generic arity: `T:Fixture.Box` ve `T:Fixture.Box\`1`.
-- Nested tip: `T:Fixture.Box\`1.Nested\`1`.
-- Overload: `M:Fixture.Box\`1.Run(System.Int32)` ve `...Run(System.String)`.
-- Generic metot arity ve type parameter ordinal'ları Roslyn formatından gelir.
-- Constructor `.ctor/.cctor`, indexer parametreleri, ref parametreleri,
-  explicit interface isimleri (`#` escaping), operator metadata isimleri ve
-  conversion return tipi Roslyn formatıyla ayrılır. Extension method normal
-  static method kimliğini ve ilk parametresini kullanır.
-- Accessor: `accessor:<owner documentation ID>:<Roslyn MethodKind>`; get/set/init
-  ve event add/remove sahibinden ayrılır. `init`, Roslyn'in `PropertySet`
-  kategorisindedir; set→init değişimi tek başına yeni kimlik üretmez.
-- File-local tip ve üyeleri: `C("file-local", relativeSourcePath, documentationId)`.
-- Local function: `C("local", containingDeclarationKey, relativeSourcePath,
-  syntaxChildNodeOrdinalPath, fullSignature)`. Ordinal yol trivia/token satır
-  numarası kullanmaz; aynı üyedeki iki ayrı blokta aynı isim/imzayı ayırır.
-  İlgili syntax hiyerarşisini yeniden düzenlemek veya önceki kardeş düğümleri
-  değiştirmek local function kimliğini değiştirebilir. Boş satırlar değiştirmez.
+The normal key is Roslyn's documentation comment ID:
 
-Partial type ve partial method aynı declaration key ile tek varlıktır; tüm
-indekslenen tanım konumları `sources` içinde kalır. Kaynak hash'i kimliğe katılmaz.
-Auto/expression-bodied property/event accessors sahibi üzerinde kaynak kanıtı
-alır; yazılı accessor ayrıca kendi kaynak konumunu taşır. Örtük constructor,
-backing field ve record'un compiler tarafından sentezlenen üyeleri
-çıkarılmaz; yazılı primary constructor parametre listesi constructor varlığı üretir. Bu sınırlar snapshot'ın declaration scope'una dahildir.
+- Namespace: `N:Fixture`; global namespace: `N:`. Project/TFM context separates them.
+- Generic arity: ``T:Fixture.Box`` versus ``T:Fixture.Box`1``; nested types retain
+  their own arity, such as ``T:Fixture.Box`1.Nested`1``.
+- Overloads include parameter types, for example
+  ``M:Fixture.Box`1.Run(System.Int32)`` versus `Run(System.String)`.
+- Generic method arity and type-parameter ordinals follow Roslyn's format.
+- Constructors `.ctor/.cctor`, indexer/ref parameters, explicit interface names
+  with `#` escaping, operator metadata names, and conversion return types remain
+  distinct. Extension methods use the static declaration and first parameter.
+- Accessors use `accessor:<owner documentation ID>:<Roslyn MethodKind>`. Get/set
+  and event add/remove are distinct. `init` is Roslyn's `PropertySet`; changing
+  set to init alone does not create a new ID.
+- File-local types/members use
+  `C("file-local", relativeSourcePath, documentationId)`.
+- Local functions use `C("local", containingDeclarationKey, relativeSourcePath,
+  syntaxChildNodeOrdinalPath, fullSignature)`. The ordinal path separates equal
+  names/signatures in distinct lexical scopes without using trivia or line numbers.
+  Rearranging syntax or preceding siblings may change it; blank lines do not.
+- Lambdas/anonymous methods use the same lexical mechanism with a `"lambda"`
+  discriminator. Type-parameter endpoints include owner declaration key,
+  TypeParameterKind, and ordinal.
 
-Yeniden adlandırma veya Roslyn documentation ID'sini değiştiren imza düzenlemesi
-(ör. parametre tipi/arity) yeni ID üretir. Tip/namespace rename, içerdiği üyelerin
-ID'lerini de değiştirir. Parametre adı, generic parametre adı, whitespace ve
-sıradan method return type değişimi documentation ID'yi değiştirmiyorsa ID sabit
-kalır; conversion return tipi bu kuralın istisnasıdır. Proje göreli yolu, TFM veya
-configuration değişirse o bağlamdaki bütün sembol ID'leri değişir. Assembly adı
-assembly ID'sini değiştirir; kaynak declaration ID'lerinin sahibi proje bağlamıdır.
+Partial types/methods share one declaration key and preserve all indexed locations
+in `sources`; source hashes do not participate in declaration identity.
+Auto/expression-bodied property/event accessors use owner evidence; explicit
+accessors also have their own source location. Implicit constructors, backing
+fields, and compiler-synthesized record members are not emitted as source
+entities. Written primary-constructor parameter lists produce constructor entities.
 
-Faz 3 JSON çıktı sözleşmesi v3, SQLite schema v2'dir;
-eski snapshot okunurken `identityVersion` varsayılanı `1` kalır. Yeni index atomik
-olarak v2 snapshot ile değiştirir; eski ID'leri yeni kimlikmiş gibi yeniden yorumlamaz.
-Kaynak yolları/satırları mutlak ve güncel analiz metnine bağlı olabilir; bunlar
-kimlik değil kanıttır. `freshness = notChecked` korunur.
+## Changes that affect identity
 
-Faz 3 lambda/anonymous method kimliği local function ile aynı lexical yol
-mekanizmasını `C("lambda", ...)` discriminator'ıyla kullanır. Type parameter
-endpoint kimliği owner declaration key + TypeParameterKind + ordinal içerir.
-İlişki/occurrence ve external endpoint kimlikleri [RELATIONSHIPS](RELATIONSHIPS.md)
-içindedir; varlıkların mevcut identity v2 kimlikleri korunur.
+Renames and signature edits that change Roslyn's documentation ID, such as parameter
+type or arity, create new IDs. Type/namespace renames also change member IDs.
+Parameter names, generic parameter names, whitespace, and ordinary method return
+types leave IDs unchanged when the documentation ID is unchanged; conversion
+return types are an exception.
+
+Changing relative project path, TFM, or configuration changes IDs throughout that
+context. Assembly renaming changes the assembly ID; source declaration IDs remain
+owned by project context. Evidence paths/lines can be absolute and depend on the
+analyzed source; they are evidence, not identity.
+
+## Versions and specialized records
+
+Current query contract is **JSON v4**, SQLite schema **3**, and declaration identity
+**2**. These are separate versions. Identity v2 was introduced in Phase 2; the
+Phase 3 JSON v3/SQLite v2 combination is historical, not the current storage format.
+Old snapshots retain identity version 1. Re-indexing creates new v2 records
+atomically and never reinterprets old IDs. Freshness defaults to `notChecked`.
+
+Relationship, occurrence, and external endpoint identities follow
+[RELATIONSHIPS](RELATIONSHIPS.md). Occurrence IDs depend on source evidence and do
+not inherit declaration relocation guarantees. Specialized registration/endpoint,
+closed-message, and framework records have their own canonical inputs documented
+in [FRAMEWORKS](FRAMEWORKS.md), [MESSAGING](MESSAGING.md), and
+[ABP-EF-REFIT](ABP-EF-REFIT.md).
