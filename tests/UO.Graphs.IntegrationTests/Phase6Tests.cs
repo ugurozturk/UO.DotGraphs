@@ -101,7 +101,8 @@ public sealed partial class CliTests
         Assert.Contains("notChecked", uncheckedStatus.Output);
         var fresh = await Run("query", "find", "Box", "--require-fresh", "--db", Database);
         Assert.True(fresh.Code == 0, fresh.Error);
-        Assert.Contains("\"stale\": \"fresh\"", fresh.Output);
+        using var freshJson = JsonDocument.Parse(fresh.Output);
+        Assert.Equal("fresh", freshJson.RootElement.GetProperty("stale").GetString());
         Assert.DoesNotContain("Loading", fresh.Error);
         Assert.Equal(before, File.ReadAllBytes(Database));
         await File.WriteAllTextAsync(Path.Combine(fixture, "Library/New.cs"), "public class BrandNew { }");

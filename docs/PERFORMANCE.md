@@ -119,3 +119,57 @@ The preceding 12,000-character negative returned exit 2 because the mandatory
 envelope required 27,146 characters. The benchmark default is therefore 50,000;
 the ten-project evidence explicitly used 12,000. These are character, not token,
 measurements. Current release gates remain in [STATUS](STATUS.md).
+
+## Query/status v5 output measurements — 2026-10-10
+
+CLI 0.10.0 Release, macOS 27.0.1 ARM64, SDK 10.0.201, runtime 10.0.5.
+Each row lists three separate CLI processes; timer covers startup, reads, JSON
+serialization and pipe collection. Cache was not flushed; concurrent integration
+tests made load uncontrolled. These are observations, not a general performance
+or token-savings claim. All emitted characters below were ASCII JSON (Unicode
+content was escaped), so UTF-8 bytes equaled Unicode scalar counts. Final LF is
+included. Each measurement manifest records argv, snapshot, environment, exit,
+bytes, scalars and raw stdout/stderr. Main DB SHA-256 was unchanged after each run.
+
+| Input / query | Exit | Scalars / UTF-8 bytes | Seconds (three repetitions) |
+| --- | --- | ---: | --- |
+| HelloGraph: symbol-default | 0 | 6,384 | 0.121 / 0.116 / 0.116 |
+| HelloGraph: callers-default | 0 | 8,747 | 0.122 / 0.119 / 0.126 |
+| HelloGraph: status-default | 0 | 4,589 | 0.097 / 0.094 / 0.099 |
+| Controlled 1930 diagnostics: symbol-default | 0 | 10,715 | 0.164 / 0.162 / 0.164 |
+| Controlled 1930 diagnostics: callers-default | 0 | 10,638 | 0.169 / 0.165 / 0.164 |
+| Controlled 1930 diagnostics: status-default | 0 | 11,045 | 0.136 / 0.140 / 0.141 |
+| Existing IslemKaydi: symbol-default | 2 | 0 | 0.116 / 0.119 / 0.116 |
+| Existing IslemKaydi: callers-default | 2 | 0 | 0.122 / 0.122 / 0.125 |
+| Existing IslemKaydi: symbol-bounded | 0 | 31,454 | 0.117 / 0.114 / 0.117 |
+| Existing IslemKaydi: callers-bounded | 0 | 33,403 | 0.119 / 0.119 / 0.117 |
+| Existing IslemKaydi: symbol-full | 0 | 1,181,618 | 0.141 / 0.141 / 0.144 |
+| Existing IslemKaydi: callers-full | 0 | 1,183,567 | 0.146 / 0.152 / 0.145 |
+
+HelloGraph snapshot: `ec638832847c43d2846c3ed6cfd41712`, real index **15 entities /
+20 relationships / 23 occurrences**. The controlled fixture clones that graph
+and snapshot ID, replacing diagnostics with 1,930 long Unicode/escaped messages
+and adding 30 project metadata records (32 total). It is output-regression data
+only, not evidence of analyzing a 32-project application. Its symbol/caller
+records and evidence agree with full output; six-site grouping is separately
+covered by the integration fixture. Full fixture symbol output was **9,277,201**
+scalars; no full diagnostic dump was placed in model context.
+
+Existing IslemKaydi snapshot: `003729cdc2294eb88cf5da2d8b67b651`; 14 projects,
+1,930 analysis diagnostics and 114 full fingerprint limitations. The measured
+method was `App.DrivingSchool.DrivingExamQueryService.GetAsync(System.Guid)`,
+ID `1c71b97f2d8206e6d866be2e3b7b2e6bf52df8a3e3fa1b032b10900eef6d9acc`.
+No re-indexing or freshness hashing was performed; freshness remains `notChecked`.
+
+The real snapshot **does not fit the default 12,000 cap**: required minima were
+**30,434** for symbol and **32,383** for callers, including unchanged full
+fingerprint limitations. Default reads correctly returned exit 2 and empty
+stdout. The explicit **50,000** budget returned one symbol/caller and full
+evidence at **31,454 / 33,403** scalars. Status minimum was **27,057**. This is
+not a successful 12,000-character real-project acceptance claim.
+
+Evidence: `.uographs/bounded-output/validation/{hello-read,fixture-read,islem-read}/`
+with `measurements.json` and raw files. Reproduce prepared reads using
+`scripts/measure_read_output.py --db DB --symbol EXACT_ID --find TEXT --evidence NEW_DIR`.
+The script never updates an index. Measurement fixtures and private project
+outputs are local ignored artifacts, not tracked release content.

@@ -1,6 +1,6 @@
 # Mediator and messaging analysis
 
-Current product 0.9.0 retains JSON v4 / SQLite 3 / delivery 1. Messaging extraction
+Current source 0.10.0 uses query/status JSON v5 / SQLite 3 / delivery 1. Messaging extraction
 uses Roslyn symbols and IOperation; the product does not acquire a mediator/event
 bus dependency or start the analyzed application, container, or broker.
 

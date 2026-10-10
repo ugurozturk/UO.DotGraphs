@@ -1,9 +1,9 @@
 # VS Code GitHub Copilot skill
 
-The skill is a terminal consumer of the independent **uographs 0.9.0** CLI. It adds
+The skill is a terminal consumer of the independent **uographs 0.10.0** CLI. It adds
 no MCP server, hosted service, API key, telemetry, LLM dependency, or runtime
-download. Tool packaging is available; see [RELEASE](RELEASE.md). JSON 4 / SQLite 3 /
-delivery 1 remain unchanged by the integration.
+download. Tool packaging is available; see [RELEASE](RELEASE.md). Query/status JSON 5, index/doctor 4, SQLite 3 and context/export 1
+are the supported contracts. Full details do not restore the old v4 JSON shape.
 
 ## Shared plugin installation
 
@@ -11,7 +11,7 @@ Copilot and Codex use the same portable Agent Plugins package at
 [plugins/uographs](../plugins/uographs/README.md). The Copilot marketplace catalog
 is [.github/plugin/marketplace.json](../.github/plugin/marketplace.json); it points
 to `./plugins/uographs`. The Codex catalog stays separate but selects the same
-package. Plugin version **0.1.1** is independent of the CLI NuGet version.
+package. Plugin version **0.2.0** is independent of the CLI NuGet version.
 
 Install the CLI separately if missing; do not reinstall an existing usable tool:
 
@@ -65,6 +65,15 @@ Invoke `/uographs:uographs` for the plugin copy; `/uographs` remains the standal
 repository skill. Both use the same instructions and CLI reference. Existing
 standalone skills are not removed; preserve customizations and review duplicates.
 Each target repository requires its own prepared index and explicit scope.
+
+The skill targets CLI **0.10.0** and query/status **v5**. Query/status default to
+a 12,000 Unicode-scalar summary including the final LF. An exact ID can go
+directly to the needed semantic query; a simple definition lookup can use `rg`
+or a small find when uographs is requested. Help, doctor, status, freshness and
+context are conditional on the task. Full diagnostics are reserved for a specific
+investigation; `--details full` still uses v5 and cannot combine with
+`--max-chars`. Older incompatible CLIs do not trigger automatic upgrades or
+unbounded-output fallbacks. Existing schema 3 indexes remain readable.
 
 **Live Copilot CLI installation / VS Code discovery / model E2E: NOT RUN.**
 See [STATUS](STATUS.md) for current verification evidence and prerequisites.
@@ -168,7 +177,7 @@ PASS/FAIL/NOT RUN without secrets.
 
 | Scenario/prompt | Expected behavior |
 | --- | --- |
-| `/uographs Who calls Greet? Do not edit code or start indexing.` | Help/doctor/status, freshness warning, bounded find → selected-ID context → callers as needed; WelcomeService source evidence; no edits/index |
+| `/uographs Who calls Greet? Do not edit code or start indexing.` | Check help only if compatibility is unknown; find only if needed, then bounded callers; context/status/freshness only when needed; WelcomeService source evidence; no edits/index |
 | Missing CLI, then missing SDK/assets | Explain prerequisites; no automatic install/build/restore |
 | Missing DB or wrong repo/TFM/configuration | Explain scope; no silently added index/trust |
 | Partial or stale/unknown/notChecked graph | Preserve coverage and freshness separately; no definitive absence from empty results |

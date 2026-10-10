@@ -1,6 +1,6 @@
 namespace UO.Graphs.Core;
 
-// Delivery has its own version; Phase 4 query JSON and SQLite remain compatible.
+// Delivery has its own version, independent of query/status JSON and SQLite.
 public sealed record DeliveryOptions(int MaxNodes = 40, int Limit = 80, int Depth = 1,
     int MaxEdges = 1000, int EvidenceLimit = 2, int MaxChars = 12000, bool IncludeSource = false)
 {

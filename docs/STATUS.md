@@ -3,16 +3,125 @@
 Last updated: **2026-10-10**.
 
 **Phase 11 hardening is implemented; full release acceptance remains incomplete.**
-Product **UO.Graphs 0.9.1**, package **UO.Graphs.Cli**, command **uographs**.
-Query/index JSON **4**, SQLite **3**, context/export **1**, declaration identity **2**.
+Source **UO.Graphs 0.10.0**, package **UO.Graphs.Cli**, command **uographs**.
+Query/status JSON **5**, index/doctor **4**, SQLite **3**, context/export **1**, declaration identity **2**.
 No new product analysis domain, service, or runtime dependency was added by hardening.
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
 
-## Current acceptance snapshot
+## Bounded query/status output and short skill workflow — 2026-10-10
 
-This table supersedes older “not run” or “in progress” statements for the same
-checks below. Historical failures remain evidence of their original environments.
+Implemented CLI 0.10.0, query/status v5 and plugin 0.2.0. Query/status now project
+stored analysis into dedicated output models, with compact summary JSON bounded
+at 12,000 Unicode scalars including LF. Diagnostics occur once, with ordinal
+three-message/300-scalar examples and explicit omissions; analysis limitations
+remain full text. Resolved endpoints and related short project contexts survive
+empty queries. Status samples ten projects by ID. Full details preserve every
+original analysis diagnostic and project field; full plus explicit max-chars is
+rejected. Whole-result pruning preserves at least one result/candidate and an
+entire path, with accurate returned/truncation metadata and usable minimum errors.
+
+SQLite schema 3 and stored graph records are unchanged; existing indexes were read
+without updating them. Index/doctor stay v4 and context/export v1. The context
+writer shares only serialization/counting code; its record selection is unchanged.
+Skill entry files distinguish definition, semantic-relation and impact tasks;
+help/doctor/status/freshness/context are conditional. Five skill/reference copies
+match. No dependency, service, hashing optimization or index automation was added.
+See [migration](MIGRATION-0.10.md), [query contract](QUERIES.md) and
+[measured output](PERFORMANCE.md#querystatus-v5-output-measurements--2026-10-10).
+
+Evidence is local under `.uographs/bounded-output/validation/`. Environment:
+macOS 27.0.1 ARM64, SDK 10.0.201, runtime 10.0.5, Release binaries. Initial
+sandbox VSTest invocations aborted before tests with SocketException (13);
+explicitly permitted standard VSTest invocations ran separately. Build/test/pack
+were kept separate from active semantic-oracle validation.
+
+| Check | Actual result |
+| --- | --- |
+| Release build | PASS, zero warnings/errors; initial 22.40 s, implementation rebuild 4.12 s, test rebuilds 2.90 s / final 4.51 s |
+| Unit VSTest | PASS 55/55, zero skipped, 7 s |
+| New bounded-output integration cases | PASS 26/26, zero skipped, 24 s |
+| Full integration | Initial run **122 PASS / 3 FAIL**, 125 total, zero skipped, 12m09s; three legacy unbounded-output invocations adapted without removing assertions |
+| Final focused integration | PASS **29/29**, zero skipped, 55 s: all 26 new cases plus the three corrected real evidence/path tests |
+| Live skill/template/plugin checks | PASS 17/17, 13.403 s; includes 12 artifact/installer checks and 14 real CLI reference examples |
+| JSON schema subset | PASS 6 command envelopes + 6 wrong-version negatives; 84 measured summary/full/context envelopes also passed |
+| License audit / CI package tests / release helper tests | PASS 143 locked entries / 10 tests / 2 tests |
+| Real HelloGraph index | PASS 15 entities / 20 relationships / 23 occurrences; snapshot ec638832847c43d2846c3ed6cfd41712 |
+| Real HelloGraph read workflow | PASS index/find/symbol/callers/callees/path/context/status; measurements have three process repeats |
+| Isolated 0.10.0 package smoke | PASS: local-feed temporary tool-path install, help/doctor, trust refusal, fresh index, query/callers/callees/context/status; all v5 reads within 12,000 |
+| Agent discovery/model E2E, Windows/Linux execution for 0.10 | NOT RUN; installed agents and other platforms were not exercised |
+| Skill creator quick_validate.py | NOT RUN: PyYAML unavailable; repository skill linter and five Ruby YAML.safe_load checks passed |
+
+The three initial integration failures were the Phase3 complete callee evidence
+round-trip and the real ABP/UO.Mediator path checks. The round-trip now explicitly
+requests full details; the indivisible long paths request a 50,000-character
+budget. The six-step UO path additionally asserts that default budget failure
+returns exit 2 with empty stdout. Existing evidence assertions were retained.
+The final focused run passed all three adapted tests and all 26 new cases. A
+second whole-suite run was NOT RUN; no product behavior changed after the full
+run (only a Core comment and the three explicit test invocation policies).
+The initial 122/125 run is not presented as a clean 125/125 run.
+
+The controlled 1,930-diagnostic/32-project metadata fixture produced symbol/caller
+summary output of **10,715 / 10,638** scalars. This is output regression evidence,
+not application-analysis acceptance. Tests also preserve six occurrence records
+as one reached target and expose evidence-limit truncation. Exact minimum and
+one-below boundaries, escapes/Unicode/LF, oversized metadata/results, paths,
+ambiguity/domain exits, empty/external results, partial/freshness guards and DB
+immutability are covered. Manual status minimum retry/below check passed at 2,649.
+
+Existing IslemKaydi was measured read-only (snapshot
+`003729cdc2294eb88cf5da2d8b67b651`, 14 projects, 1,930 diagnostics). Main DB SHA-256
+remained unchanged. Its 114 full fingerprint limitations make mandatory metadata
+larger than 12,000: default symbol/callers correctly returned exit 2, empty stdout,
+and minimum budgets **30,434 / 32,383**. With explicit 50,000, both returned one
+record with evidence at **31,454 / 33,403** scalars; full was
+**1,181,618 / 1,183,567**. This does not claim successful default-budget acceptance
+for that real snapshot. Freshness remained `notChecked`; no re-index or hashing
+check was run. Three repetitions, actual argv, snapshot/environment, exit, UTF-8
+bytes and scalar counts are in measurement manifests. No token or general speed
+improvement percentage is claimed.
+
+Commands used (all read measurements preserve explicit DB paths):
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit-permitted.trx' --results-directory .uographs/bounded-output/validation
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~BoundedOutput' --logger 'trx;LogFileName=bounded-permitted.trx' --results-directory .uographs/bounded-output/validation
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=integration-full.trx' --results-directory .uographs/bounded-output/validation
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~BoundedOutput|FullyQualifiedName~SemanticEvidenceSurvivesSQLiteAndSeparateCliProcess|FullyQualifiedName~Phase9AbpRealPackagePersistsContractsRepositoriesAndInferredCandidates|FullyQualifiedName~UoRealPackageEndpointServiceRequestHandlerChainSurvivesPathAndContext' --logger 'trx;LogFileName=final-focused.trx' --results-directory .uographs/bounded-output/validation
+dotnet src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll index samples/HelloGraph/HelloGraph.slnx --full --trust-project --db .uographs/bounded-output/validation/hello.db
+python3 -B scripts/test_skill.py --cli src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll --db .uographs/bounded-output/validation/hello.db --evidence .uographs/bounded-output/validation/skill-live.json
+python3 -B scripts/check_contracts.py --db .uographs/bounded-output/validation/hello.db --index-raw .uographs/bounded-output/validation/index.json --evidence .uographs/bounded-output/validation/contracts
+python3 -B scripts/measure_read_output.py --db .uographs/bounded-output/validation/hello.db --symbol 'HelloGraph.Domain.Greeter.Greet(string)' --find 'HelloGraph.Domain.Greeter.Greet' --evidence .uographs/bounded-output/validation/hello-read
+python3 -B scripts/measure_read_output.py --db /Volumes/KioxiaDepom/Calismalarim/IslemKaydi/backend/.uographs/graph.db --symbol 1c71b97f2d8206e6d866be2e3b7b2e6bf52df8a3e3fa1b032b10900eef6d9acc --find App.DrivingSchool.DrivingExamQueryService.GetAsync --evidence .uographs/bounded-output/validation/islem-read
+dotnet pack src/UO.Graphs.Cli -c Release --no-build --no-restore -m:1 -nr:false --output .uographs/bounded-output/validation/packages
+python3 -B scripts/smoke_package.py .uographs/bounded-output/validation/packages --version 0.10.0 --evidence .uographs/bounded-output/validation/package-smoke
+python3 -B scripts/audit_licenses.py --check
+python3 -B scripts/test_ci_package.py
+python3 -B scripts/test_release_tools.py
+git diff --check
+```
+
+Local package `UO.Graphs.Cli.0.10.0.nupkg` SHA-256:
+`4c1a7fce1eb260a5df1ceda8a5242bddce1437b5f46009f7b49cd67d772e4d35`.
+The package verifier passed version/HEAD metadata/payload checks and both packaged
+templates match source bytes. This was built from the uncommitted local tree;
+nuspec HEAD is not proof of published source. The package contains STATUS just
+before its smoke result was appended here. No release/upload claim is made.
+
+Changed areas: Core read-output models/writer/shared JSON counting, SQLite query
+result projection, CLI parser/help and version; integration contract/budget tests;
+all five skill/reference copies and plugin catalog/version; measurement/package/
+skill/contract scripts; current contract, migration, performance and status docs.
+No commit, push, publication or installed-plugin replacement was performed.
+Suggested commit: `feat: bound query output and streamline the uographs skill`.
+
+## Earlier release acceptance snapshot (before 0.10)
+
+This table records the earlier published/package validation. It does not validate
+0.10 on Linux or installed agent sessions. The bounded-output record above gives
+the current change's results. Historical failures retain their original scope.
 
 | Check | Latest verified result |
 | --- | --- |

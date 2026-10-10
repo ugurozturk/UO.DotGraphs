@@ -14,7 +14,7 @@ public sealed partial class CliTests
         Assert.Contains(graph.Relationships, e => e.Kind == RelationshipKind.MODULE_DEPENDS_ON && e.Confidence == Confidence.Exact);
         var endpoint = Assert.Single(graph.Entities, e => e.HttpEndpoint?.Framework == "abp" && e.Name.Contains("BookAppService.GetAsync"));
         var book = Assert.Single(graph.Entities, e => e.DocumentationId == "T:AbpFixture.Book");
-        var path = await Run("query", "path", endpoint.Id, book.Id, "--edge-types", "HANDLED_BY,REPOSITORY_ENTITY", "--include-inferred", "--db", Database);
+        var path = await Run("query", "path", endpoint.Id, book.Id, "--edge-types", "HANDLED_BY,REPOSITORY_ENTITY", "--include-inferred", "--max-chars", "50000", "--db", Database);
         Assert.True(path.Code == 0, path.Error);
         Assert.Contains("REPOSITORY_ENTITY", path.Output);
         Assert.Contains("inferred", path.Output);

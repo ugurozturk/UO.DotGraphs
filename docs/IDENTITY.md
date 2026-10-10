@@ -75,7 +75,7 @@ analyzed source; they are evidence, not identity.
 
 ## Versions and specialized records
 
-Current query contract is **JSON v4**, SQLite schema **3**, and declaration identity
+Current query contract is **JSON v5**, SQLite schema **3**, and declaration identity
 **2**. These are separate versions. Identity v2 was introduced in Phase 2; the
 Phase 3 JSON v3/SQLite v2 combination is historical, not the current storage format.
 Old snapshots retain identity version 1. Re-indexing creates new v2 records

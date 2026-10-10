@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import platform
 from pathlib import Path
 import signal
 import subprocess
@@ -48,8 +49,17 @@ def main():
                         subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], check=False)
                     process.wait()
                     code = "TIMEOUT"
-            results.append({"name": name, "exit": code, "expected": expected,
-                            "seconds": time.monotonic() - start})
+            raw = (out / f"{name}.stdout").read_bytes()
+            text = raw.decode("utf-8")
+            try:
+                document = json.loads(text)
+            except json.JSONDecodeError:
+                document = {}
+            results.append({"name": name, "argv": argv, "exit": code, "expected": expected,
+                            "seconds": time.monotonic() - start, "utf8Bytes": len(raw),
+                            "unicodeScalars": len(text),
+                            "snapshot": document.get("snapshotId", document.get("analysis", {}).get("id")),
+                            "platform": platform.platform(), "cwd": str(ROOT)})
             (out / "commands.json").write_text(json.dumps(results, indent=2))
             if code != expected:
                 raise RuntimeError(f"{name}: expected {expected}, got {code}; see {out / (name + '.stderr')}")
@@ -69,6 +79,18 @@ def main():
         run("index", [tool, "index", "samples/HelloGraph/HelloGraph.slnx", "--trust-project", "--full", *common])
         run("query", [tool, "query", "find", "Greet", *common])
         run("context", [tool, "context", "HelloGraph.Domain.Greeter.Greet(string)", *common])
+        run("callers", [tool, "query", "callers", "HelloGraph.Domain.Greeter.Greet(string)", *common])
+        run("callees", [tool, "query", "callees", "HelloGraph.App.WelcomeService.Welcome(string)", *common])
+        run("status", [tool, "status", *common])
+        for name in ("query", "callers", "callees", "status"):
+            text = (out / f"{name}.stdout").read_text()
+            data = json.loads(text)
+            version = data["contractVersion"] if name == "status" else data["schemaVersion"]
+            if version != 5 or data["budget"]["actualChars"] != len(text) or len(text) > 12000:
+                raise RuntimeError(f"Packaged {name} violated the v5 default budget")
+        for name in ("callers", "callees"):
+            if not json.loads((out / f"{name}.stdout").read_text())["items"]:
+                raise RuntimeError(f"Packaged {name} lost HelloGraph relationships")
         index = json.loads((out / "index.stdout").read_text())
         query = json.loads((out / "query.stdout").read_text())
         context = json.loads((out / "context.stdout").read_text())
@@ -76,7 +98,7 @@ def main():
             raise RuntimeError("Packaged index/query/context returned no expected HelloGraph evidence")
         if index["analysis"]["toolVersion"] != args.version:
             raise RuntimeError("Graph toolVersion does not match the package version")
-    print("PASS: local-feed install, help, doctor, trust rejection, fresh index, query and context")
+    print("PASS: local-feed install, help, doctor, trust rejection, fresh index, query/callers/callees/context/status")
 
 
 if __name__ == "__main__":

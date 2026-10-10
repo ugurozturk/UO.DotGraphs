@@ -1,4 +1,4 @@
-# Graph queries — JSON v4
+# Graph queries — JSON v5
 
 Queries read a local committed snapshot without MSBuild, restore, downloads, or
 shell execution. All accept `--db <path>` (default `.uographs/graph.db`),
@@ -95,14 +95,14 @@ stdout empty and explain the error on stderr.
 
 | Field | Meaning |
 | --- | --- |
-| `schemaVersion` | Query contract version **4** |
+| `schemaVersion` | Query contract version **5** |
 | `snapshotId` | Analysis ID of the snapshot read |
-| `analysisContext` | Complete analysis metadata: projects, SDK/TFM/configuration and source policy |
+| `analysisContext` | Snapshot/input/root, versions, policy and related compact project contexts; full adds all project details |
 | `completeness` | Analysis coverage/limitations, independent of query truncation |
 | `stale` | Default `notChecked`; explicit checks can report fresh/stale/unknown |
 | `truncated` | At least one search/candidate/result/evidence bound removed information |
 | `items` | `{symbol, entity, distance, path}` |
-| `diagnostics` | `{code,message}` analysis and query explanations |
+| `diagnostics` | `{code,message}` query explanations only |
 | `command`, `arguments`, `options` | Query and normalized effective options, including defaults |
 | `limits` | Depth/limit/maxEdges/evidenceLimit, returned, examinedEdges, ordered reasons |
 | `outcome` | ok, found, notFound, boundedSearchIncomplete, ambiguousSymbol, symbolNotFound |
@@ -114,9 +114,49 @@ source ranges/hashes, reasons, bound targets, and candidates survive round trips
 Queries add no random IDs or timestamps; identical snapshot/options are deterministic.
 
 JSON v3 find fields `results/relationships/occurrences` are historical. Current
-consumers use `items[].entity` and traversal `items[].path[]`. Index/status/doctor
-retain their structures with `contractVersion: 4`; status `schemaVersion` means
+consumers use `items[].entity` and traversal `items[].path[]`. Index/doctor retain `contractVersion: 4`; status uses `contractVersion: 5`.
+Status `schemaVersion` means
 SQLite schema **3**, not query schema. Freshness adds its own cost/limitation data.
+
+## Bounded query and status output
+
+Both commands default to `--details summary --max-chars 12000`. The range is
+1..1,000,000 Unicode scalar values in the compact serialized JSON including its
+final LF. `budget.actualChars` is the actual count; this is neither bytes nor tokens.
+`--details summary|full` is valid only on query/status. Full has no character cap;
+combining it with explicit `--max-chars` returns exit 2 and empty stdout.
+
+`analysisDiagnostics` contains `total`, `samples` and `omitted`. Summary samples
+are the first three messages in ordinal order, each at most 300 Unicode scalars;
+`truncated` marks a shortened message. This order is not severity ranking. No
+severity, diagnostic code or related method is inferred from plain text.
+Analysis limitations occur once in `completeness.limitations`, in full text.
+
+Query project contexts cover `resolvedStart`, `resolvedTarget`, returned items,
+and their complete evidence paths, even when a resolved query returns no items.
+Each short context contains ID/path, TFM/configuration, SDK/language version,
+preprocessor symbols and skipped TFMs. Status shows the first ten projects by ID.
+`totalProjects` and `omittedProjects` report the scope; `metadataSummary` reports
+omitted diagnostics/projects and whether detailed project metadata was omitted.
+These counts do not indicate graph coverage or missing relationships.
+
+When necessary, the writer removes diagnostic samples, then status project
+samples, then whole query items from the tail. Query removal sets `truncated`
+and `limits.reasons: ["maxChars", ...]`; `limits.returned` counts actual items.
+At least one complete item remains for nonempty queries (including ambiguous
+candidates), and a path remains intact. Ambiguity/outcome/exit codes never change
+because candidates were removed. Source locations, hashes, confidence, reasons
+and path steps are never sliced. If mandatory metadata plus that item cannot fit,
+exit 2 leaves stdout empty and stderr states the minimum required budget.
+
+```sh
+uographs status --details full --db 'DB'
+uographs query callers 'SYMBOL_ID' --details full --db 'DB'
+```
+
+Full returns every original analysis diagnostic and every project metadata field
+once. Traversal/result/evidence limits still apply. See [the v5 migration](MIGRATION-0.10.md)
+for consumer changes; full does not restore the old v4 envelope.
 
 ## SQLite behavior
 

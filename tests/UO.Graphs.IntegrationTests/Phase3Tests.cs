@@ -18,7 +18,8 @@ public sealed partial class CliTests
         Assert.Equal(2, graph.Occurrences.Count(o => o.RelationshipId == edge.Id));
         Assert.NotNull(edge.Source.EntityId);
         Assert.NotNull(edge.Target!.EntityId);
-        var query = await Run("query", "callees", edge.Source.Id, "--format", "json", "--db", Database);
+        // Round-trip every selected relationship; summary may prune whole tail records.
+        var query = await Run("query", "callees", edge.Source.Id, "--format", "json", "--details", "full", "--db", Database);
         Assert.Equal(0, query.Code);
         using var json = JsonDocument.Parse(query.Output);
         var steps = json.RootElement.GetProperty("items").EnumerateArray().SelectMany(i => i.GetProperty("path").EnumerateArray()).ToArray();

@@ -29,7 +29,7 @@ def run(*tokens, expected=0):
         for key in ['schemaVersion', 'snapshotId', 'analysisContext', 'completeness', 'stale',
                     'truncated', 'items', 'diagnostics', 'options', 'limits']:
             assert key in data, key
-        assert data['schemaVersion'] == 4
+        assert data['schemaVersion'] == 5
         assert data['stale'] == 'notChecked'
         assert data['snapshotId'] == status['analysis']['id']
     return data

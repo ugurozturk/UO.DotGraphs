@@ -31,7 +31,7 @@ The marketplace name and plugin name are both `uographs`. Install once for your
 Codex user account and use it across repositories, subject to repository and
 organization policy. The plugin bundles the existing skill and CLI reference;
 it adds no MCP server, hook, setup skill, authentication integration, or automatic
-NuGet download. Plugin version 0.1.1 is independent of the CLI NuGet version.
+NuGet download. Plugin version 0.2.0 is independent of the CLI NuGet version.
 Copilot uses the same plugin through its own marketplace catalog; see
 [COPILOT-SKILL](COPILOT-SKILL.md).
 GitHub installation is not verified until those files are available remotely.
@@ -86,8 +86,15 @@ CLI/IDE users can inspect `/skills`. If a new skill does not appear, restart Cod
 Check for same-named skills in other scopes because Codex does not merge them.
 No optional UI metadata is required; automatic selection remains enabled by default.
 
-Provide a prepared CLI and explicit database path. The skill checks help, doctor,
-status, scope and freshness before bounded symbol/context queries. Index creation
+Provide a prepared CLI 0.10.0 and explicit database path. The skill selects the
+shortest useful route: definition lookup and source, the needed semantic query,
+or bounded impact with source/tests. Help is conditional on unknown compatibility;
+doctor diagnoses runtime trouble. Query metadata usually replaces a separate
+status call. Freshness checks and context expansion depend on the task. Query and
+status default to a 12,000 Unicode-scalar summary, including the final LF; full
+diagnostics are only for a specific investigation. Unchecked reads stay
+`notChecked`; source hash matches do not prove global freshness. The skill does
+not fall back to unbounded output on an incompatible older CLI. Index creation
 or update requires authorization covering MSBuild trust and analysis scope. It
 never silently installs/restores, grants trust, or enables generators. Sharing
 source/graph output with Codex remains subject to AI data policy; a local database

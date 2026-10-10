@@ -37,7 +37,7 @@ public sealed partial class CliTests : IDisposable
             Assert.Equal(0, found.Code);
             Assert.Empty(found.Error);
             using var json = JsonDocument.Parse(found.Output);
-            Assert.Equal(4, json.RootElement.GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(5, json.RootElement.GetProperty("schemaVersion").GetInt32());
             Assert.Equal(analysisId, json.RootElement.GetProperty("analysisContext").GetProperty("id").GetString());
             var entity = Assert.Single(json.RootElement.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("entity")), e => e.GetProperty("documentationId").GetString() == docId);
             Assert.Equal(name, entity.GetProperty("name").GetString());

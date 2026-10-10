@@ -118,17 +118,8 @@ public static class DeliveryWriter
         return true;
     }
 
-    public static int Characters(string text) => text.EnumerateRunes().Count();
-    private static string SerializeCounted(JsonObject document)
-    {
-        while (true)
-        {
-            var text = document.ToJsonString(Json) + "\n";
-            var count = Characters(text);
-            if (document["budget"]!["actualChars"]!.GetValue<int>() == count) return text;
-            document["budget"]!["actualChars"] = count;
-        }
-    }
+    public static int Characters(string text) => OutputJson.Characters(text);
+    private static string SerializeCounted(JsonObject document) => OutputJson.SerializeCounted(document);
 
     public static DeliveryOutput Export(DeliveryGraph graph, string format)
     {

@@ -137,7 +137,27 @@ def run(args, expected=0, env=None, timeout=45):
         if stdout or not stderr:
             raise AssertionError("Fatal error must have empty stdout and explanatory stderr")
         return stderr
-    return stdout if args == ["--help"] else json.loads(stdout)
+    if args == ["--help"]:
+        return stdout
+    document = json.loads(stdout)
+    if args[0] in ("query", "status"):
+        version_field = "schemaVersion" if args[0] == "query" else "contractVersion"
+        if document[version_field] != 5:
+            raise AssertionError("Skill requires query/status contract 5")
+        if not stdout.endswith("\n") or document["budget"]["actualChars"] != len(stdout):
+            raise AssertionError("Budget must include every Unicode scalar and final LF")
+        if document["details"] == "summary":
+            if len(stdout) > document["budget"]["maxChars"]:
+                raise AssertionError("Summary exceeds its declared character budget")
+        elif document["budget"]["maxChars"] is not None:
+            raise AssertionError("Full output must explicitly have no character budget")
+        context = document["analysisContext" if args[0] == "query" else "analysis"]
+        if "diagnostics" in context or "limitations" in context:
+            raise AssertionError("Analysis diagnostics/limitations must not be duplicated")
+        diagnostics = document["analysisDiagnostics"]
+        if diagnostics["total"] != len(diagnostics["samples"]) + diagnostics["omitted"]:
+            raise AssertionError("Diagnostic counts do not match")
+    return document
 
 
 class ArtifactTests(unittest.TestCase):
@@ -307,11 +327,15 @@ class ArtifactTests(unittest.TestCase):
 
     def test_examples_are_bounded_and_no_shell_or_approval_metadata(self):
         commands = examples(SKILL / "references/cli.md")
-        self.assertEqual(12, len(commands))
+        self.assertEqual(14, len(commands))
         for command in commands:
             self.assertFalse(set(command) & {";", "|", "&&", "||", ">", "--full", "--allow-generators"})
+            if command[1] in ("query", "status") and "full" in command:
+                self.assertNotIn("--max-chars", command)
             if command[1] == "query":
                 self.assertIn("--limit", command)
+                if "full" not in command:
+                    self.assertIn("--max-chars", command)
                 if command[2] != "find":
                     self.assertIn("--max-edges", command)
             if command[1] == "context":
@@ -471,10 +495,13 @@ class IncrementalSubprocessTests(unittest.TestCase):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path)
+    parser.add_argument("--cli", type=Path, help="Prepared CLI DLL; defaults to the Debug build")
     parser.add_argument("--run-index", action="store_true")
     parser.add_argument("--evidence", type=Path, default=ROOT / ".uographs/phase10-evidence/tests.json")
     args = parser.parse_args()
     DATABASE = args.db.resolve() if args.db else None
+    if args.cli:
+        CLI = args.cli.resolve()
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ArtifactTests)
     if DATABASE:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(CliTests))

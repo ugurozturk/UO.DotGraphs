@@ -32,6 +32,10 @@ internal static class Cli
         Include-source: context only; at most 3 C# snippets, 12 lines/1200 chars each,
         1 MiB/file; excludes secret/config paths and requires snapshot hash match.
 
+        Query/status output: --details summary|full (default summary), --max-chars <1..1000000>.
+        Summary defaults to 12000 Unicode scalars including final LF; compact JSON.
+        Full includes all analysis metadata/diagnostics once; incompatible with --max-chars.
+        Query/status contract 5; index/doctor 4; context/export 1; SQLite schema 3.
         Query options: --direction outgoing|incoming|both --edge-types CALLS,USES_TYPE,...
                        --depth <0..100> --limit <1..10000> --include-inferred
                        --max-edges <1..1000000> --evidence-limit <1..1000>
@@ -70,7 +74,7 @@ internal static class Cli
                 case "help": Console.WriteLine(Help); return 0;
                 case "doctor":
                     var sdk = await ProjectPreparation.GetSdkVersionAsync(Environment.CurrentDirectory);
-                    Write(new { contractVersion = GraphJson.ContractVersion, command = "doctor", runtime = Environment.Version.ToString(), sdk,
+                    Write(new { contractVersion = GraphJson.DoctorContractVersion, command = "doctor", runtime = Environment.Version.ToString(), sdk,
                         requiredDevelopmentSdk = "10.0.201", automaticRestore = false, targetProjectChecked = false,
                         preparation = "Install the SDK selected by the target global.json and explicitly run dotnet restore <target> in an approved environment. Index checks SDK/assets after --trust-project; doctor does not evaluate projects." });
                     return 0;
@@ -92,7 +96,7 @@ internal static class Cli
                         var validatedAnalysis = indexed.Analysis with { Freshness = validationState,
                             FreshnessCheck = new(validationState, "indexEvaluationAndContentValidation", run.FilesHashed, run.BytesHashed,
                                 run.FingerprintMilliseconds + run.AnalysisMilliseconds, run.Fingerprint.Limitations) };
-                        Write(new { contractVersion = GraphJson.ContractVersion, command = "index", database = Path.GetFullPath(command.Database),
+                        Write(new { contractVersion = GraphJson.IndexContractVersion, command = "index", database = Path.GetFullPath(command.Database),
                             mode = command.Full ? "full" : "incremental", run.Outcome, granularity = "entireSelectedProjectClosure",
                             run.ProjectsAnalyzed, run.FingerprintMilliseconds, run.AnalysisMilliseconds, run.FilesHashed, run.BytesHashed,
                             dependencyFingerprint = new { run.Fingerprint.Complete, run.Fingerprint.Limitations },
@@ -102,8 +106,9 @@ internal static class Cli
                     return 0;
                 case "status":
                     var status = store.Status(command.CheckFreshness, command.RequireFresh);
-                    Write(new { contractVersion = GraphJson.ContractVersion, command = "status", schemaVersion = status.SchemaVersion,
-                        database = Path.GetFullPath(command.Database), analysis = status.Analysis, entityCount = status.EntityCount, relationshipCount = status.RelationshipCount, occurrenceCount = status.OccurrenceCount });
+                    var statusOutput = ReadOutputWriter.Status(status.Analysis, status.SchemaVersion, Path.GetFullPath(command.Database),
+                        status.EntityCount, status.RelationshipCount, status.OccurrenceCount, command.ReadOutput);
+                    Console.Out.Write(statusOutput.Text);
                     return 0;
                 case "context":
                     var context = DeliveryWriter.Context(store.ReadDelivery(command.Value!, command.Delivery!, lexical: true, checkFreshness: command.CheckFreshness, requireFresh: command.RequireFresh));
@@ -115,7 +120,7 @@ internal static class Cli
                     return exported.ExitCode;
                 case "find" or "symbol" or "callers" or "callees" or "dependencies" or "path" or "impact":
                     var result = store.Query(command.Name, command.Value!, command.Target, command.QueryOptions, command.CheckFreshness, command.RequireFresh);
-                    Write(result.Envelope);
+                    Console.Out.Write(ReadOutputWriter.Query(result, command.ReadOutput).Text);
                     return result.ExitCode;
                 default: throw new InvalidOperationException("Unknown parsed command.");
             }
@@ -148,6 +153,7 @@ internal static class Cli
         var includeSource = false;
         string? symbol = null;
         var format = "json";
+        var details = "summary";
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Length; i++)
         {
@@ -157,6 +163,7 @@ internal static class Cli
             if (!seen.Add(arg)) throw new GraphException(2, $"Duplicate option: {arg}");
             switch (arg)
             {
+                case "--details": details = Value(); break;
                 case "--full": full = true; break;
                 case "--incremental": break;
                 case "--check-freshness": checkFreshness = true; break;
@@ -229,9 +236,14 @@ internal static class Cli
         var isDelivery = name is "context" or "export";
         if (format != "json" && !(name == "export" && format is "ndjson" or "mermaid" or "dot"))
             throw new GraphException(2, "Format must be json (export also supports ndjson, mermaid, dot).");
-        if (seen.Contains("--symbol") && name != "export" || (maxChars is not null || includeSource) && name != "context" ||
+        if (seen.Contains("--symbol") && name != "export" || includeSource && name != "context" ||
             maxNodes is not null && !isDelivery)
             throw new GraphException(2, "Delivery option is not valid for this command.");
+        var isReadOutput = isQuery || name == "status";
+        if (seen.Contains("--details") && !isReadOutput || maxChars is not null && !isReadOutput && name != "context")
+            throw new GraphException(2, "--details requires query/status; --max-chars requires query/status/context.");
+        ReadOutputOptions? readOutput = isReadOutput ? new(details, maxChars) : null;
+        readOutput?.Validate();
         if (name == "export" && depth is not null && symbol is null)
             throw new GraphException(2, "Export --depth requires --symbol; full export has no traversal root.");
         if (isDelivery && (direction is not null || edgeTypes is not null || includeInferred))
@@ -257,7 +269,7 @@ internal static class Cli
             delivery.Validate();
         }
         return new(name, name == "context" ? tokens[1] : name == "export" ? symbol : isQuery ? tokens[2] : name == "index" ? tokens[1] : null, database, trust, options,
-            name == "path" ? tokens[3] : null, queryOptions, delivery, format, full, checkFreshness, requireFresh);
+            name == "path" ? tokens[3] : null, queryOptions, delivery, format, full, checkFreshness, requireFresh, readOutput);
     }
 
     private static void Write(object value) => Console.Out.WriteLine(JsonSerializer.Serialize(value, GraphJson.Options));
@@ -266,5 +278,5 @@ internal static class Cli
         Console.Error.WriteLine($"uographs: {message}");
         return code;
     }
-    private sealed record Command(string Name, string? Value, string Database, bool Trust, IndexOptions? Options = null, string? Target = null, QueryOptions? QueryOptions = null, DeliveryOptions? Delivery = null, string Format = "json", bool Full = false, bool CheckFreshness = false, bool RequireFresh = false);
+    private sealed record Command(string Name, string? Value, string Database, bool Trust, IndexOptions? Options = null, string? Target = null, QueryOptions? QueryOptions = null, DeliveryOptions? Delivery = null, string Format = "json", bool Full = false, bool CheckFreshness = false, bool RequireFresh = false, ReadOutputOptions? ReadOutput = null);
 }

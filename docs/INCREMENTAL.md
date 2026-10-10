@@ -1,8 +1,8 @@
 # Incremental indexing and freshness
 
-Incremental indexing uses query JSON v4, SQLite schema 3 with an optional
+Incremental indexing uses query JSON v5, SQLite schema 3 with an optional
 `fingerprint` table, and context/export format 1. It was introduced in product
-0.6.0; the current product is **0.9.0**. Legacy snapshots without a manifest remain
+0.6.0; the current source is **0.10.0**. Legacy snapshots without a manifest remain
 readable where their schema allows; checked freshness is unknown, and the next
 index rebuilds the selected scope.
 

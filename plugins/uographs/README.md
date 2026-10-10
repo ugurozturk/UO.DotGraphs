@@ -83,12 +83,21 @@ of an installation route does not establish live VS Code/Copilot acceptance.
 
 Existing standalone skills are not removed; same-named copies may both appear.
 
+The skill targets CLI **0.10.0** and query/status **v5**. Query/status default to
+a 12,000 Unicode-scalar summary including the final LF. An exact ID can go
+directly to the needed semantic query; a simple definition lookup can use `rg`
+or a small find when uographs is requested. Help, doctor, status, freshness and
+context are conditional on the task. Full diagnostics are reserved for a specific
+investigation; `--details full` still uses v5 and cannot combine with
+`--max-chars`. Older incompatible CLIs do not trigger automatic upgrades or
+unbounded-output fallbacks. Existing schema 3 indexes remain readable.
+
 Each repository needs its own prepared graph index. Missing CLI/SDK/index or a
 stale/partial graph is reported, never repaired through automatic installation,
 restore or indexing. Project evaluation requires explicit `--trust-project`.
 Local graph storage does not make the agent offline: content passed to it remains
 subject to your organization's AI data policy.
 
-The plugin's version is 0.1.1 and is maintained independently of the
+The plugin's version is 0.2.0 and is maintained independently of the
 CLI's NuGet version. The skill and CLI reference are copied byte-for-byte from
 both standalone agent templates, with parity checked by repository tests.

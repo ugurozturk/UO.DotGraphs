@@ -13,7 +13,10 @@ public sealed partial class CliTests
         var endpoint = Assert.Single(graph.Entities, e => e.Name == "GET /phase8/start");
         var handler = Assert.Single(graph.Entities, e => e.DocumentationId == "M:UoFlows.HandlerB.HandleAsync(UoFlows.RequestB)");
         const string edges = "HANDLED_BY,CALLS,DISPATCHES,POSSIBLE_TARGET";
-        var query = await Run("query", "path", endpoint.Id, handler.Id, "--edge-types", edges, "--depth", "10", "--include-inferred", "--db", Database);
+        var tooSmall = await Run("query", "path", endpoint.Id, handler.Id, "--edge-types", edges, "--depth", "10", "--include-inferred", "--db", Database);
+        Assert.Equal(2, tooSmall.Code);
+        Assert.Empty(tooSmall.Output); // A six-step path must not be sliced to fit the default budget.
+        var query = await Run("query", "path", endpoint.Id, handler.Id, "--edge-types", edges, "--depth", "10", "--include-inferred", "--max-chars", "50000", "--db", Database);
         Assert.True(query.Code == 0, query.Error + query.Output);
         using var json = JsonDocument.Parse(query.Output);
         var path = Assert.Single(json.RootElement.GetProperty("items").EnumerateArray()).GetProperty("path");

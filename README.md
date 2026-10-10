@@ -9,14 +9,19 @@ service, API key, or telemetry. It never automatically restores or downloads
 project dependencies. Indexing requires explicit permission to evaluate the
 project with MSBuild through `--trust-project`.
 
-Current version: **0.9.0**. Package: **UO.Graphs.Cli**. Query JSON: **4**;
+Source version: **0.10.0**. Package: **UO.Graphs.Cli**. Query/status JSON: **5**;
 SQLite schema: **3**; context/export format: **1**; declaration identity: **2**.
 Linux CI and local macOS checks have passed; Windows, physical offline validation,
 and real Copilot E2E remain open. See [verified status](docs/STATUS.md).
 
 ## Install
 
-Version 0.9.0 was pushed to NuGet by the
+The skill in this checkout requires CLI 0.10.0 / query-status v5. The published
+0.9.0 installation commands below are historical release instructions and are
+not compatible with the new skill. Build/package this source in an explicitly
+authorized environment to validate 0.10.0 locally; no 0.10.0 publication is claimed.
+
+The published version 0.9.0 was pushed to NuGet by the
 [verified publishing workflow](https://github.com/ugurozturk/UO.DotGraphs/actions/runs/37997326843).
 A .NET 10 runtime is required to run the tool. Indexing also requires the target's
 selected SDK, reference packs, and previously restored assets.
@@ -155,7 +160,7 @@ writer lease protect publication; readers see one consistent generation.
 
 Help is plain text; export uses the selected format. Other successful commands
 emit one JSON document to stdout; progress and errors go to stderr. Fatal errors
-leave stdout empty. Query JSON v4 contains `snapshotId`, `analysisContext`,
+leave stdout empty. Query JSON v5 contains `snapshotId`, `analysisContext`,
 `completeness`, `stale`, `truncated`, `items`, `diagnostics`, effective options,
 limits, and outcome. Index/status/doctor carry `contractVersion: 4`.
 The status `schemaVersion` describes SQLite, currently 3.
@@ -271,3 +276,7 @@ NuGet prerequisites, the existing Python installer, and verification boundaries.
 | ABP, EF Core, Refit | [ABP-EF-REFIT](docs/ABP-EF-REFIT.md) |
 | Delivery, measurements, trust | [RELEASE](docs/RELEASE.md), [PERFORMANCE](docs/PERFORMANCE.md), [SECURITY](docs/SECURITY.md) |
 | Actual results and license inventory | [STATUS](docs/STATUS.md), [DEPENDENCIES](docs/DEPENDENCIES.md), [notices](THIRD-PARTY-NOTICES.txt) |
+
+Query/status now default to compact JSON within 12,000 Unicode scalar values.
+See [0.10 migration](docs/MIGRATION-0.10.md) for `--details full`, character budgets,
+and skill compatibility. This source change does not publish a NuGet package.

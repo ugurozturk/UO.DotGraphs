@@ -33,12 +33,14 @@ def main():
     parser.add_argument('--db',type=Path,required=True)
     parser.add_argument('--index-raw',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
+    parser.add_argument('--cli',type=Path,default=ROOT/'src/UO.Graphs.Cli/bin/Release/net10.0/uographs.dll')
+    parser.add_argument('--symbol',default='HelloGraph.Domain.Greeter.Greet(string)')
     args=parser.parse_args()
     args.evidence.mkdir(parents=True,exist_ok=False)
     schema=json.loads(SCHEMA.read_text())
-    cli=['dotnet',str(ROOT/'src/UO.Graphs.Cli/bin/Debug/net10.0/uographs.dll')]
-    commands=[['doctor'],['status','--db',str(args.db)],['query','find','M0','--limit','1','--db',str(args.db)],
-              ['context','P0000.C0.M0()','--max-chars','50000','--db',str(args.db)],
+    cli=['dotnet',str(args.cli)]
+    commands=[['doctor'],['status','--db',str(args.db)],['query','find','Greet','--limit','1','--db',str(args.db)],
+              ['context',args.symbol,'--max-chars','50000','--db',str(args.db)],
               ['export','--format','json','--max-nodes','2','--limit','1','--db',str(args.db)]]
     count=0
     for i,argv in enumerate(commands):

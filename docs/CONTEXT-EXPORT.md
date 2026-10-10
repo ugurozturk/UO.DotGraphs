@@ -1,6 +1,6 @@
 # Context and export contract
 
-Current product: **0.9.0**; delivery `formatVersion: 1`, query/index contract 4,
+Current source: **0.10.0**; delivery `formatVersion: 1`, query/status contract 5, index/doctor 4,
 SQLite schema 3. Each command reads one snapshot in a read-only transaction,
 without MSBuild, restore, LLMs, embeddings, remote services, or renderers.
 Legacy SQLite schemas 1/2 require explicit re-indexing (exit 4).

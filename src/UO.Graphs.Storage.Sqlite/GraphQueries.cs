@@ -35,6 +35,7 @@ public sealed partial class GraphStore
         private readonly List<QueryDiagnostic> diagnostics = [];
         private readonly Dictionary<string, (RelationshipOccurrence[] Items, bool Truncated)> evidence = new(StringComparer.Ordinal);
         private int examined;
+        private RelationshipSymbol? resolvedStart, resolvedTarget;
         private sealed record Walk(string Id, int Distance, Walk? Previous = null, GraphRelationship? Edge = null);
 
         public QueryResult Run()
@@ -47,6 +48,7 @@ public sealed partial class GraphStore
             }
             var start = Resolve(value);
             if (start.Failure is { } failure) return failure;
+            resolvedStart = Item(new(start.Id!, 0)).Symbol;
             if (command == "symbol") return Finish([Item(new(start.Id!, 0))], "ok");
             string? destination = null;
             if (command == "path")
@@ -54,6 +56,7 @@ public sealed partial class GraphStore
                 var end = Resolve(target!);
                 if (end.Failure is { } endFailure) return endFailure;
                 destination = end.Id;
+                resolvedTarget = Item(new(end.Id!, 0)).Symbol;
             }
             if (command == "impact") diagnostics.Add(new("potentialImpact",
                 "Potential static dependency impact only; no runtime execution or dispatch guarantee. REFERENCES/DECLARES do not propagate impact."));
@@ -217,12 +220,10 @@ public sealed partial class GraphStore
 
         private QueryResult Finish(QueryItem[] items, string outcome, int exitCode = 0)
         {
-            var allDiagnostics = analysis.Diagnostics.Order(StringComparer.Ordinal).Select(d => new QueryDiagnostic("analysis", d))
-                .Concat(diagnostics).ToArray();
-            return new(new(GraphJson.ContractVersion, analysis.Id, analysis,
+            return new(new(GraphJson.QueryContractVersion, analysis.Id, analysis,
                 new(analysis.Coverage, analysis.Limitations), analysis.Freshness, reasons.Count > 0, items,
-                allDiagnostics, "query." + command, target is null ? [value] : [value, target], options,
-                new(options.Depth, options.Limit, options.MaxEdges, options.EvidenceLimit, items.Length, examined, reasons.ToArray()), outcome), exitCode);
+                diagnostics.ToArray(), "query." + command, target is null ? [value] : [value, target], options,
+                new(options.Depth, options.Limit, options.MaxEdges, options.EvidenceLimit, items.Length, examined, reasons.ToArray()), outcome) { ResolvedStart = resolvedStart, ResolvedTarget = resolvedTarget }, exitCode);
         }
 
         private SqliteCommand Command(string text)

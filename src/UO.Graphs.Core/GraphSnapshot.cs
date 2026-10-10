@@ -104,7 +104,10 @@ public static class GraphIdentity
 
 public static class GraphJson
 {
-    public const int ContractVersion = 4;
+    public const int IndexContractVersion = 4;
+    public const int DoctorContractVersion = 4;
+    public const int QueryContractVersion = 5;
+    public const int StatusContractVersion = 5;
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,

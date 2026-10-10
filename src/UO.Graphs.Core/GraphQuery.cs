@@ -40,6 +40,10 @@ public sealed record QueryLimits(int Depth, int Limit, int MaxEdges, int Evidenc
 public sealed record QueryEnvelope(int SchemaVersion, string SnapshotId, AnalysisSnapshot AnalysisContext,
     QueryCompleteness Completeness, string Stale, bool Truncated, QueryItem[] Items,
     QueryDiagnostic[] Diagnostics, string Command, string[] Arguments, QueryOptions Options, QueryLimits Limits,
-    string Outcome);
+    string Outcome)
+{
+    public RelationshipSymbol? ResolvedStart { get; init; }
+    public RelationshipSymbol? ResolvedTarget { get; init; }
+}
 
 public sealed record QueryResult(QueryEnvelope Envelope, int ExitCode = 0);
