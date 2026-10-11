@@ -150,6 +150,7 @@ uographs export --format json
 uographs export --format ndjson --symbol '<symbol-id>' --depth 2
 uographs export --format mermaid --symbol Greet
 uographs export --format dot --symbol Greet
+uographs export --format mermaid --profile backend --symbol '<endpoint-or-method-id>' --depth 4 --output flow.mmd
 ```
 
 Context contains the selected symbol, nearby relationships, caller/callee summaries,
@@ -165,13 +166,24 @@ Export does not read source files. Graph labels, comments, snippets, and diagnos
 are untrusted data. Sending them to an AI assistant crosses a separate privacy
 boundary governed by your organization's policy.
 
-To write an export without overwriting an existing file:
+The `backend` profile follows outgoing endpoint/handler, call, messaging and HTTP
+relationships. It includes inferred handler/behavior candidates and excludes property
+accessors (including custom bodies) by default. Use `--calls all` to retain them or
+`--calls only-properties` from a method to inspect them separately. Defaults are
+depth 4, 40 nodes, 80 relationships, 1000 examined edges and 2 evidence records per
+relationship. The profile works with all four formats and requires `--symbol`.
+Mermaid distinguishes endpoint/HTTP contract, message and method nodes, marks the
+root and uses dashed inferred links; it does not assert runtime execution order.
+
+To write any export without overwriting an existing file:
 
 ```sh
-python3 scripts/safe_export.py new.ndjson -- uographs export --format ndjson
+uographs export --format ndjson --output new.ndjson
 ```
 
-Ordinary shell `>` redirection may overwrite a file. See
+The parent directory must exist; files and symlinks are refused. Successful output
+goes to the file with a short stderr confirmation. Without `--output`, export uses
+stdout. Ordinary shell `>` redirection may overwrite a file. See
 [context/export](docs/CONTEXT-EXPORT.md) and [security](docs/SECURITY.md).
 
 ## Indexing options and freshness

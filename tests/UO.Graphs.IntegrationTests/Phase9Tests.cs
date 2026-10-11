@@ -54,6 +54,12 @@ public sealed partial class CliTests
         var export = await Run("export", "--format", "json", "--max-nodes", "1000", "--limit", "10000", "--db", Database);
         Assert.True(export.Code == 0, export.Error);
         Assert.Contains("httpContract", export.Output);
+        var backend = new UO.Graphs.Storage.Sqlite.GraphStore(Database).ReadDelivery(caller.Id, BackendOptions);
+        var http = Assert.Single(backend.Edges, e => e.Relationship.Kind == RelationshipKind.INVOKES_HTTP);
+        Assert.Contains(backend.Nodes, n => n.Symbol.Id == http.Relationship.Target!.Id && n.Entity?.HttpContract is not null);
+        Assert.Contains(backend.Edges, e => e.Relationship.Kind == RelationshipKind.POSSIBLE_ENDPOINT &&
+            e.Relationship.Source.Id == http.Relationship.Target!.Id && e.Relationship.Target is null && e.Evidence.Length > 0);
+        Assert.DoesNotContain(backend.Nodes, n => n.Entity?.HttpContract?.ContractMethod.Contains("ISecondApi", StringComparison.Ordinal) == true);
     }
     private static void Phase9Valid(GraphSnapshot graph)
     {

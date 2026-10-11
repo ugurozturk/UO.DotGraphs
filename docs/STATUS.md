@@ -9,6 +9,84 @@ No new product analysis domain, service, or runtime dependency was added by hard
 [Release](RELEASE.md), [measurements](PERFORMANCE.md), [trust boundary](SECURITY.md),
 and [previous phase](history/PHASE10.md) contain supporting details.
 
+## Backend flow export and file output — 2026-10-11
+
+Implemented `export --profile graph|backend` and `--output <new-path>` for all four
+formats. The default graph profile/context contract stays at format 1. Backend
+requires an exact symbol selection, traverses only the eight outgoing flow kinds,
+includes inferred handler/behavior candidates, and applies Roslyn accessor filters
+before budgets. Defaults: depth 4, nodes 40, relationships 80, examined edges 1000,
+evidence 2; property accessors including custom bodies are excluded by default.
+No extractor, storage schema, dependency or product version change.
+
+Backend Mermaid distinguishes endpoint/HTTP contract, message and method nodes,
+styles the root and inferred links, counts collected unresolved records at their
+source, and shows static-analysis/freshness/coverage/filter/truncation notes. Full
+identity, evidence and analysis metadata remain in comments. Output stages UTF-8
+without BOM in the existing destination directory, flushes and publishes without
+replacement. Existing files/directories/symlinks are refused; failed selection,
+read or freshness checks create no destination. See [contract](CONTEXT-EXPORT.md).
+
+Validation: macOS ARM64, SDK **10.0.201**. Evidence is under
+`.uographs/backend-export/`; final product build is `build-delivery.log`.
+
+| Check | Actual result |
+| --- | --- |
+| Release build, no restore | PASS **9.32 s**, zero warnings/errors |
+| Final unit suite, `unit-delivery.trx` | PASS **55/55**, zero skipped, **7 s** |
+| Final focused integration, `backend-delivery.trx` | PASS **57/57**, zero skipped, **73 s**; prior expanded run also passed 57/57 in 75 s |
+| Final CLI smoke, three existing snapshots | PASS **123 subprocess calls**, 41 per snapshot, with per-call argv/exit/stderr in `*-delivery/commands.json` |
+| Default compatibility | PASS: all four graph formats and context byte-identical to previously prepared Debug CLI for the same HelloGraph snapshot; final Release checks in `baseline-parity-delivery.json` |
+| File behavior | PASS: stdout/file UTF-8 byte equality; existing file/directory, live/dangling symlink, missing/non-directory parent, path-length and Unix write-permission failures; temporary cleanup; selection/read/freshness failure creates no destination |
+| License audit | PASS **143** unchanged locked dependencies |
+| Script/document checks | PASS: Python AST, three edited Markdown documents plus the new STATUS section, 18 shell blocks, relative file links, CLI help and `git diff --check` |
+
+The focused suite covers endpoint → handler → calls, message candidates/behaviors,
+Refit HTTP/unresolved relationships, real Roslyn custom accessors, all selection
+bounds, cycles, ambiguity, Unicode/escaping, deterministic record insertion order,
+all four formats, context and compact-query regressions. Framework integration
+tests index controlled fixtures into temporary databases; standalone smoke only
+reads existing indexes. No application host or remote endpoint is started.
+
+Standalone backend results at default bounds:
+
+| Existing fixture snapshot | Nodes / relationships | Coverage / freshness | Truncation |
+| --- | --- | --- | --- |
+| UO.Mediator `ef7d776004ec4287ae6e82b8f89153ba` | 9 / 10 | partial / notChecked | depth |
+| Refit `c029944fc1e545c7acb7a4ea05ab90f3` | 4 / 4 | partial / notChecked | none |
+| Accessor workflow `654c25bc858848628f58130df11c3c13` | 8 / 7 | partial / notChecked | none |
+
+Database SHA-256 stayed unchanged for all three smoke snapshots and HelloGraph
+compatibility reads. These are existing static fixtures, not global freshness or
+runtime/application acceptance. The first focused run was **45 PASS / 1 FAIL**:
+a new test compared array-bearing evidence records by reference equality. It now
+compares every serialized evidence field against the original occurrence. Existing
+assertions were preserved. The next focused run passed 57/57 after adding compact
+regression and Unix output-permission coverage.
+
+Commands actually run (final artifacts):
+
+```sh
+dotnet build UO.Graphs.slnx -c Release --no-restore -m:1 -nr:false -p:UseSharedCompilation=false
+dotnet test tests/UO.Graphs.UnitTests -c Release --no-build --no-restore -m:1 -nr:false --logger 'trx;LogFileName=unit-delivery.trx' --results-directory .uographs/backend-export
+dotnet test tests/UO.Graphs.IntegrationTests -c Release --no-build --no-restore -m:1 -nr:false --filter 'FullyQualifiedName~Backend|FullyQualifiedName~Export|FullyQualifiedName~Delivery|FullyQualifiedName~Context|FullyQualifiedName~SourceIsOptIn|FullyQualifiedName~UoRealPackageEndpointServiceRequestHandlerChain|FullyQualifiedName~Phase9Refit|FullyQualifiedName~Compact' --logger 'trx;LogFileName=backend-delivery.trx' --results-directory .uographs/backend-export
+python3 -B scripts/backend_export_smoke.py --db .uographs/phase8-direct-uo.db --symbol 3d1ee0c9d536fab4bf2ffc0d06c6032931e1cb4e4a24baeb7dc739500453d943 --output-dir .uographs/backend-export/uo-delivery
+python3 -B scripts/backend_export_smoke.py --db .uographs/phase9-refit.db --symbol 0211830afd2fd6c01499f1d048e33589636ebeb7250eadbacf9a5a20e6bcd9ba --output-dir .uographs/backend-export/refit-delivery
+python3 -B scripts/backend_export_smoke.py --db .uographs/compact-output/fixture.db --symbol be5b321dbf2f8008e726a7d6c752f760132eff0fa22fde86c09330b29e6a02b6 --output-dir .uographs/backend-export/workflow-delivery
+python3 -B scripts/audit_licenses.py --check
+git diff --check
+```
+
+Changed files: CLI `Program.cs`; Core `GraphDelivery.cs`, `DeliveryWriter.cs`;
+Storage.Sqlite `GraphDelivery.cs`, `GraphQueries.cs` (shared accessor filter);
+integration `BackendExportTests.cs`, `Phase8Tests.cs`, `Phase9Tests.cs`;
+`scripts/backend_export_smoke.py`; README, CONTEXT-EXPORT, SECURITY and STATUS.
+Full integration suite, Windows/Linux execution and external Mermaid renderer
+visual acceptance: **NOT RUN** in this focused macOS pass. PNG/SVG rendering,
+runtime ordering and architectural grouping remain outside scope. No production
+re-index, restore, package installation, commit, push or publication was performed.
+Suggested commit: `feat: add backend flow export and safe file output`.
+
 ## Skill definition lookup routing — 2026-10-11
 
 Definition lookup keeps `rg` for simple name/file searches and uses `query symbol`

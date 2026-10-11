@@ -9,6 +9,8 @@ public sealed partial class GraphStore
     public DeliveryGraph ReadDelivery(string? symbol, DeliveryOptions options, bool lexical = false, bool checkFreshness = false, bool requireFresh = false)
     {
         options.Validate();
+        if (options.Profile == "backend" && (symbol is null || lexical))
+            throw new GraphException(2, "Backend export requires an exact --symbol selection.");
         if (symbol is not null && (string.IsNullOrWhiteSpace(symbol) || symbol.Length > 1024))
             throw new GraphException(2, "Symbol text must contain 1..1024 UTF-16 code units.");
         using var connection = Open(readOnly: true);
@@ -134,11 +136,20 @@ public sealed partial class GraphStore
 
         private List<GraphRelationship> ReadEdges(string? id)
         {
+            var where = id is null ? "" : "WHERE (source_id = $id OR target_id = $id) ";
+            if (options.Profile == "backend")
+                where = "WHERE source_id = $id AND kind IN (" +
+                    string.Join(",", DeliveryOptions.BackendEdgeTypes.Select((_, i) => "$kind" + i)) +
+                    ") AND " + PropertyCallFilter(options.Calls) + " ";
             // Indexed adjacency; full export explicitly scans graph records. No source files are opened here.
+            // Backend filters precede LIMIT and budgets, so excluded rows do not consume traversal work.
             using var sql = Command("SELECT id, source_id, target_id, json FROM relationships " +
-                (id is null ? "" : "WHERE source_id = $id OR target_id = $id ") +
+                where +
                 "ORDER BY CASE kind WHEN 'CALLS' THEN 0 WHEN 'OVERRIDES' THEN 1 WHEN 'IMPLEMENTS' THEN 1 WHEN 'INHERITS' THEN 1 WHEN 'USES_TYPE' THEN 2 WHEN 'PROJECT_REFERENCES' THEN 2 WHEN 'REFERENCES' THEN 3 ELSE 4 END, id LIMIT $limit");
             if (id is not null) sql.Parameters.AddWithValue("$id", id);
+            if (options.Profile == "backend")
+                for (var i = 0; i < DeliveryOptions.BackendEdgeTypes.Count; i++)
+                    sql.Parameters.AddWithValue("$kind" + i, DeliveryOptions.BackendEdgeTypes[i].ToString());
             sql.Parameters.AddWithValue("$limit", options.MaxEdges - examined + 1);
             using var reader = sql.ExecuteReader();
             var result = new List<GraphRelationship>();

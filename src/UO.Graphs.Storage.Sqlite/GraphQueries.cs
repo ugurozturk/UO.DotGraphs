@@ -6,6 +6,18 @@ namespace UO.Graphs.Storage.Sqlite;
 
 public sealed partial class GraphStore
 {
+    // Formal accessor identities come from Roslyn MethodKind, never display/name heuristics.
+    private static string PropertyCallFilter(string calls)
+    {
+        const string property = "(kind = 'CALLS' AND (json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertyGet' OR json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertySet'))";
+        return calls switch
+        {
+            "exclude-properties" => $"NOT COALESCE({property}, 0)",
+            "only-properties" => $"COALESCE({property}, 0)",
+            _ => "1"
+        };
+    }
+
     public QueryResult Query(string command, string value, string? target = null, QueryOptions? options = null, bool checkFreshness = false, bool requireFresh = false)
     {
         if (command is not ("find" or "symbol" or "callers" or "callees" or "dependencies" or "path" or "impact") ||
@@ -139,14 +151,7 @@ public sealed partial class GraphStore
             };
             var types = string.Join(",", options.EdgeTypes.Select((_, i) => "$kind" + i));
             var scope = $"{direction} AND kind IN ({types}) AND confidence IN ('exact', 'unresolved', $confidence)";
-            // Match the formal accessor identity emitted from Roslyn MethodKind, not a display/name heuristic.
-            const string property = "(kind = 'CALLS' AND (json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertyGet' OR json_extract(json, '$.target.declarationId') GLOB 'accessor:*:PropertySet'))";
-            var filter = selection.Calls switch
-            {
-                "exclude-properties" => $"NOT COALESCE({property}, 0)",
-                "only-properties" => $"COALESCE({property}, 0)",
-                _ => "1"
-            };
+            var filter = PropertyCallFilter(selection.Calls);
             using var counts = Sql($"SELECT count(*), COALESCE(sum(CASE WHEN {filter} THEN 1 ELSE 0 END),0), COALESCE(sum(CASE WHEN {filter} AND id <= $after THEN 1 ELSE 0 END),0) FROM relationships WHERE {scope}");
             int total, eligible, before;
             using (var reader = counts.ExecuteReader())

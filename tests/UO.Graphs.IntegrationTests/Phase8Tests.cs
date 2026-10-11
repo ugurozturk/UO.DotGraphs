@@ -36,6 +36,13 @@ public sealed partial class CliTests
         Assert.Contains("other services/repositories", context.Output);
         Assert.Equal("partial", graph.Analysis.Coverage);
         Assert.All(graph.Entities.Where(e => e.Message is not null), e => Assert.NotEmpty(e.Sources));
+        var backend = new UO.Graphs.Storage.Sqlite.GraphStore(Database).ReadDelivery(endpoint.Id,
+            BackendOptions with { Depth = 8, MaxNodes = 300, Limit = 800, MaxEdges = 10000 });
+        Assert.Contains(backend.Nodes, n => n.Symbol.Id == handler.Id);
+        Assert.Contains(backend.Edges, e => e.Relationship.Kind == RelationshipKind.HANDLED_BY);
+        Assert.Contains(backend.Edges, e => e.Relationship.Kind == RelationshipKind.DISPATCHES);
+        Assert.Contains(backend.Edges, e => e.Relationship.Kind == RelationshipKind.POSSIBLE_BEHAVIOR && e.Relationship.Confidence == Confidence.Inferred);
+        Assert.All(backend.Edges, e => Assert.Contains(e.Relationship.Kind, DeliveryOptions.BackendEdgeTypes));
     }
 
     [Fact]

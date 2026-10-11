@@ -2,10 +2,21 @@ namespace UO.Graphs.Core;
 
 // Delivery has its own version, independent of query/status JSON and SQLite.
 public sealed record DeliveryOptions(int MaxNodes = 40, int Limit = 80, int Depth = 1,
-    int MaxEdges = 1000, int EvidenceLimit = 2, int MaxChars = 12000, bool IncludeSource = false)
+    int MaxEdges = 1000, int EvidenceLimit = 2, int MaxChars = 12000, bool IncludeSource = false,
+    string Profile = "graph", string Calls = "all")
 {
+    public static IReadOnlyList<RelationshipKind> BackendEdgeTypes { get; } = Array.AsReadOnly(new[]
+    {
+        RelationshipKind.HANDLED_BY, RelationshipKind.CALLS, RelationshipKind.DISPATCHES,
+        RelationshipKind.PUBLISHES, RelationshipKind.POSSIBLE_TARGET, RelationshipKind.POSSIBLE_BEHAVIOR,
+        RelationshipKind.INVOKES_HTTP, RelationshipKind.POSSIBLE_ENDPOINT
+    });
+
     public void Validate()
     {
+        if (Profile is not ("graph" or "backend") || Calls is not ("all" or "exclude-properties" or "only-properties") ||
+            Profile == "graph" && Calls != "all")
+            throw new GraphException(2, "Export --profile must be graph or backend; --calls all|exclude-properties|only-properties requires backend.");
         if (MaxNodes is < 1 or > 10000 || Limit is < 1 or > 10000 || Depth is < 0 or > 10 ||
             MaxEdges is < 1 or > 100000 || EvidenceLimit is < 1 or > 100 || MaxChars is < 1 or > 1000000)
             throw new GraphException(2, "Delivery bounds: max-nodes/limit 1..10000, depth 0..10, max-edges 1..100000, evidence-limit 1..100, max-chars 1..1000000.");

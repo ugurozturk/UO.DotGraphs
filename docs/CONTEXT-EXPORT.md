@@ -12,9 +12,11 @@ uographs export --format json
 uographs export --format ndjson --symbol '<exact-symbol-id>' --depth 2
 uographs export --format mermaid --symbol Greet --depth 1
 uographs export --format dot --symbol Greet --depth 1
+uographs export --format mermaid --profile backend --symbol '<endpoint-or-method-id>' --depth 4 --output flow.mmd
 ```
 
 All accept `--db <path>`, default `.uographs/graph.db`, and freshness options.
+Export accepts `--profile graph|backend`; `graph` is the unchanged default.
 The tool is packaged; see [RELEASE](RELEASE.md). From a source build, use
 `dotnet run --project src/UO.Graphs.Cli --no-build --no-restore --` as the prefix.
 
@@ -50,13 +52,14 @@ templates are labeled and never run automatically.
 | `--evidence-limit` | 2 occurrences/relationship | 20 occurrences/relationship | 1..100 |
 
 The root counts toward max-nodes; candidates are bounded by min(limit,max-nodes).
-Collection uses BFS in both directions, prioritizing CALLS, then inheritance/
+Context and the default graph profile use BFS in both directions, prioritizing CALLS, then inheritance/
 implementation/overrides, type/project dependencies, and REFERENCES. DECLARES and all framework kinds
 share the remaining priority; ties use ordinal relationship ID.
 Cycles/diamonds do not duplicate nodes or edges. Inferred edges are included with
 their confidence and can be traversed; unresolved records retain null targets and
 are not traversed. These commands do not accept include-inferred, direction, or
-edge-types; use [queries](QUERIES.md) for those policies.
+edge-types; use [queries](QUERIES.md) for those policies. Backend's fixed selection
+policy is described below.
 
 A focused subgraph contains relationships collected while expanding nodes below
 the depth bound. It is not guaranteed to contain every edge among boundary nodes.
@@ -69,6 +72,63 @@ Unfocused export first selects bounded nodes by ID, then bounded relationships b
 priority/ID. Relationships whose endpoints are excluded are omitted with maxNodes
 reported, so no dangling asserted targets are emitted. Depth without symbol is invalid.
 Final serialization orders nodes, relationships, and occurrences by ordinal ID.
+
+## Backend profile
+
+`export --profile backend` requires an exact `--symbol` selection, with the same
+ambiguity/candidate output and exits 7/8. It is available for JSON, NDJSON, Mermaid
+and DOT. Only outgoing `HANDLED_BY`, `CALLS`, `DISPATCHES`, `PUBLISHES`,
+`POSSIBLE_TARGET`, `POSSIBLE_BEHAVIOR`, `INVOKES_HTTP` and `POSSIBLE_ENDPOINT`
+relationships are eligible. Inferred candidates are included. No extractor,
+index update, schema migration, runtime dependency or execution order is added.
+
+Defaults: **depth 4, max-nodes 40, limit 80, max-edges 1000, evidence-limit 2**.
+The corresponding existing options override them within the ranges above. BFS,
+cycle detection, CALLS-first/ordinal-ID selection, boundary-edge handling and
+truncation reasons are preserved. Direction, relationship-kind and property filters
+are applied in SQL before traversal budgets and LIMIT; excluded nodes/edges do not
+consume those budgets. The examined count covers eligible adjacency rows, not
+physical SQLite work. A selected root always counts as one node.
+
+`--calls all|exclude-properties|only-properties` is accepted for backend export:
+
+- `exclude-properties` (default) removes CALLS to Roslyn `PropertyGet`/`PropertySet`
+  accessor declaration identities, including accessors with custom bodies.
+- `all` retains all eligible relationship kinds and calls.
+- `only-properties` keeps only accessor CALLS; other relationships and unresolved
+  calls with no accessor identity are excluded. Start from the relevant method;
+  an endpoint root cannot traverse HANDLED_BY under this filter.
+
+No name matching or business-layer inference is used. Excluding property bodies
+can hide meaningful work; inspect them separately when needed. Backend metadata
+adds `selection` with the profile, outgoing kinds, call policy, inferred inclusion,
+unresolved policy and ordering. The default graph/context envelopes are unchanged.
+
+Backend Mermaid uses `flowchart LR`, rounded endpoint/HTTP-contract nodes,
+hexagonal message nodes, rectangular method/other symbols and a distinct root
+style. Shapes use stored entity metadata, not names. Exact links are solid and
+inferred links dashed; both retain kind/confidence labels. Unresolved relationships
+have no drawn target; their source label reports the number of **collected**
+unresolved records. Full evidence and reasons remain in JSON comments. A note box
+shows static-analysis limits, freshness, coverage, call filter and truncation. It
+does not claim runtime dispatch, pipeline order or complete unresolved counts.
+DOT uses the same selection/evidence with its existing directed-graph notation.
+
+## File output
+
+`--output <path>` is available for every export format/profile. The parent directory
+must already exist. Existing files, directories and symlinks (including dangling
+links) are refused with exit 6; there is no overwrite switch. Output is UTF-8
+without a BOM, byte-identical to stdout for the same successful command.
+
+The CLI finishes selection/read/serialization before creating a temporary sibling,
+flushes it and publishes without replacing an existing destination. Success leaves
+stdout empty and writes a short confirmation to stderr. Selection errors retain
+their candidate/outcome payload on stdout and exits 7/8, creating no file. Read or
+freshness errors likewise create no output file. Filesystem failures return exit 6
+and clean up the temporary file. Without `--output`, stdout behavior is unchanged.
+Shell redirection has its own overwrite semantics and is not protected by this
+option. No renderer or PNG/SVG output is included.
 
 ## Whole-output context budget
 

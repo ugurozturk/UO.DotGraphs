@@ -21,12 +21,19 @@ internal static class Cli
           uographs query path <from-id> <to-id> [options]
           uographs context <symbol-id-or-text> [--max-chars <n>] [--format json] [--include-source]
           uographs export --format json|ndjson|mermaid|dot [--symbol <id-or-exact-name>]
+                          [--profile graph|backend] [--output <new-path>]
 
         Context/export: --db <path> --max-nodes <1..10000> --limit <1..10000>
                         --depth <0..10> --max-edges <1..100000> --evidence-limit <1..100>
         Defaults context/export: nodes 40/1000, relationships 80/5000, depth 1,
         examined edges 1000/10000, evidence per edge 2/20. Export without --symbol
         selects the full graph within these bounds; --depth requires --symbol.
+        Backend export requires --symbol, follows outgoing flow relationships, includes
+        inferred candidates; defaults: depth 4, nodes 40, relationships 80, edges 1000,
+        evidence 2. --calls all|exclude-properties|only-properties (default exclude-properties)
+        filters Roslyn property accessors including custom bodies before traversal budgets.
+        Graph profile is the default. --output requires an existing parent directory and
+        refuses existing files/symlinks; successful export goes to file, summary to stderr.
         Context max-chars: 12000 (1..1000000), entire stdout in Unicode scalar values,
         including final LF. Too-small envelope: exit 2, no stdout. No token count.
         Include-source: context only; at most 3 C# snippets, 12 lines/1200 chars each,
@@ -125,7 +132,12 @@ internal static class Cli
                     return context.ExitCode;
                 case "export":
                     var exported = DeliveryWriter.Export(store.ReadDelivery(command.Value, command.Delivery!, checkFreshness: command.CheckFreshness, requireFresh: command.RequireFresh), command.Format);
-                    Console.Out.Write(exported.Text);
+                    if (command.Output is null || exported.ExitCode != 0) Console.Out.Write(exported.Text);
+                    else
+                    {
+                        WriteExport(command.Output, exported.Text);
+                        Console.Error.WriteLine($"uographs: Exported {command.Format} to {command.Output}");
+                    }
                     return exported.ExitCode;
                 case "find" or "symbol" or "callers" or "callees" or "dependencies" or "path" or "impact":
                     var result = store.Query(command.Name, command.Value!, command.Target, command.QueryOptions, command.CheckFreshness, command.RequireFresh);
@@ -165,6 +177,8 @@ internal static class Cli
         var details = "summary";
         var view = "standard";
         var calls = "all";
+        var profile = "graph";
+        string? output = null;
         string? after = null, snapshot = null;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Length; i++)
@@ -177,6 +191,8 @@ internal static class Cli
             {
                 case "--view": view = Value(); break;
                 case "--calls": calls = Value(); break;
+                case "--profile": profile = Value(); break;
+                case "--output": output = Value(); break;
                 case "--after": after = Value(); break;
                 case "--snapshot": snapshot = Value(); break;
                 case "--details": details = Value(); break;
@@ -250,6 +266,13 @@ internal static class Cli
             throw new GraphException(2, "Freshness options require status, query, context or export.");
         var isQuery = tokens[0] == "query";
         var isDelivery = name is "context" or "export";
+        if (seen.Any(s => s is "--profile" or "--output") && name != "export")
+            throw new GraphException(2, "--profile and --output require export.");
+        if (profile is not ("graph" or "backend"))
+            throw new GraphException(2, "--profile must be graph or backend.");
+        var backend = name == "export" && profile == "backend";
+        if (backend && symbol is null)
+            throw new GraphException(2, "Backend export requires --symbol.");
         if (format != "json" && !(name == "export" && format is "ndjson" or "mermaid" or "dot"))
             throw new GraphException(2, "Format must be json (export also supports ndjson, mermaid, dot).");
         if (seen.Contains("--symbol") && name != "export" || includeSource && name != "context" ||
@@ -258,14 +281,15 @@ internal static class Cli
         var isReadOutput = isQuery || name == "status";
         if (seen.Contains("--details") && !isReadOutput || maxChars is not null && !isReadOutput && name != "context")
             throw new GraphException(2, "--details requires query/status; --max-chars requires query/status/context.");
-        if (seen.Contains("--view") && !isQuery || seen.Any(s => s is "--calls" or "--after" or "--snapshot") && (!isQuery || view != "compact"))
-            throw new GraphException(2, "--view requires query; --calls/--after/--snapshot require --view compact.");
+        if (seen.Contains("--view") && !isQuery || seen.Any(s => s is "--after" or "--snapshot") && (!isQuery || view != "compact") ||
+            seen.Contains("--calls") && !backend && (!isQuery || view != "compact"))
+            throw new GraphException(2, "--view requires query; --after/--snapshot require compact query; --calls requires compact query or backend export.");
         ReadOutputOptions? readOutput = isReadOutput ? new(details, maxChars, view) : null;
         readOutput?.Validate();
         if (name == "export" && depth is not null && symbol is null)
             throw new GraphException(2, "Export --depth requires --symbol; full export has no traversal root.");
         if (isDelivery && (direction is not null || edgeTypes is not null || includeInferred))
-            throw new GraphException(2, "Context/export use both directions and preserve all confidence classes and edge types.");
+            throw new GraphException(2, "Context/export direction, confidence and edge types are determined by the profile.");
         if (trust && name != "index" || seen.Contains("--format") && !isQuery && !isDelivery || seen.Contains("--db") && name == "doctor")
             throw new GraphException(2, "Option is not valid for this command. Use --help.");
         if (name != "index" && seen.Any(s => s is "--configuration" or "--framework" or "--root" or "--allow-generators" or "--generated"))
@@ -277,20 +301,45 @@ internal static class Cli
         queryOptions = queryOptions with { Direction = direction ?? queryOptions.Direction, EdgeTypes = edgeTypes ?? queryOptions.EdgeTypes,
             Depth = depth ?? queryOptions.Depth, Limit = limit ?? queryOptions.Limit, IncludeInferred = includeInferred,
             MaxEdges = maxEdges ?? queryOptions.MaxEdges, EvidenceLimit = evidenceLimit ?? queryOptions.EvidenceLimit };
-        if (view == "compact" && name is "callees" or "callers" or "dependencies" && queryOptions.Depth == 1 ||
-            seen.Any(s => s is "--calls" or "--after" or "--snapshot"))
+        if (isQuery && (view == "compact" && name is "callees" or "callers" or "dependencies" && queryOptions.Depth == 1 ||
+            seen.Any(s => s is "--calls" or "--after" or "--snapshot")))
             queryOptions = queryOptions with { Selection = new(calls, after, snapshot) };
         if (isQuery) queryOptions.Validate(name);
         DeliveryOptions? delivery = null;
         if (isDelivery)
         {
-            delivery = new(maxNodes ?? (name == "context" ? 40 : 1000), limit ?? (name == "context" ? 80 : 5000),
-                depth ?? 1, maxEdges ?? (name == "context" ? 1000 : 10000), evidenceLimit ?? (name == "context" ? 2 : 20),
-                maxChars ?? 12000, includeSource);
+            var small = name == "context" || backend;
+            delivery = new(maxNodes ?? (small ? 40 : 1000), limit ?? (small ? 80 : 5000),
+                depth ?? (backend ? 4 : 1), maxEdges ?? (small ? 1000 : 10000), evidenceLimit ?? (small ? 2 : 20),
+                maxChars ?? 12000, includeSource, profile, backend ? (seen.Contains("--calls") ? calls : "exclude-properties") : "all");
             delivery.Validate();
         }
         return new(name, name == "context" ? tokens[1] : name == "export" ? symbol : isQuery ? tokens[2] : name == "index" ? tokens[1] : null, database, trust, options,
-            name == "path" ? tokens[3] : null, queryOptions, delivery, format, full, checkFreshness, requireFresh, readOutput);
+            name == "path" ? tokens[3] : null, queryOptions, delivery, format, full, checkFreshness, requireFresh, readOutput, output);
+    }
+
+    private static void WriteExport(string path, string text)
+    {
+        var destination = Path.GetFullPath(path);
+        if (File.Exists(destination) || Directory.Exists(destination) || new FileInfo(destination).LinkTarget is not null)
+            throw new GraphException(6, "Export destination already exists (files and symlinks are never overwritten).");
+        // Stage beside the destination, then publish without replacement. A failed write never
+        // leaves a partial destination; Move also rejects a destination created after our check.
+        var temporary = Path.Combine(Path.GetDirectoryName(destination)!, ".uographs-export-" + Guid.NewGuid().ToString("N"));
+        var created = false;
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                created = true;
+                using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false), leaveOpen: true);
+                writer.Write(text);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, destination, overwrite: false);
+        }
+        finally { if (created) File.Delete(temporary); }
     }
 
     private static void Write(object value) => Console.Out.WriteLine(JsonSerializer.Serialize(value, GraphJson.Options));
@@ -299,5 +348,5 @@ internal static class Cli
         Console.Error.WriteLine($"uographs: {message}");
         return code;
     }
-    private sealed record Command(string Name, string? Value, string Database, bool Trust, IndexOptions? Options = null, string? Target = null, QueryOptions? QueryOptions = null, DeliveryOptions? Delivery = null, string Format = "json", bool Full = false, bool CheckFreshness = false, bool RequireFresh = false, ReadOutputOptions? ReadOutput = null);
+    private sealed record Command(string Name, string? Value, string Database, bool Trust, IndexOptions? Options = null, string? Target = null, QueryOptions? QueryOptions = null, DeliveryOptions? Delivery = null, string Format = "json", bool Full = false, bool CheckFreshness = false, bool RequireFresh = false, ReadOutputOptions? ReadOutput = null, string? Output = null);
 }

@@ -71,8 +71,20 @@ not prove a missing package payload or a specific permissions failure.
 
 ## Export and skill installation
 
-CLI export writes stdout and cannot prevent shell `>` from truncating an existing
-file. Use:
+CLI export defaults to stdout and cannot prevent shell `>` from truncating an
+existing file. Prefer built-in exclusive destination publication:
+
+```sh
+uographs export --format ndjson --output NEW_FILE
+```
+
+The parent directory must exist. Existing files, directories and symlinks are
+refused. Serialization finishes before file creation; a temporary sibling file is
+flushed and moved without replacement. Selection/read errors create no destination;
+write/publication errors clean up the temporary file. These are ordinary filesystem
+operations, not a sandbox against concurrent ancestor-directory mutation.
+
+The older subprocess helper remains available:
 
 ```sh
 python3 scripts/safe_export.py NEW_FILE -- uographs export --format ndjson

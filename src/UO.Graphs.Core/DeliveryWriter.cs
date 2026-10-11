@@ -128,7 +128,8 @@ public static class DeliveryWriter
 
     public static DeliveryOutput Export(DeliveryGraph graph, string format)
     {
-        var metadata = new { formatVersion = FormatVersion, command = "export", graph.Scope, graph.Outcome, graph.Match,
+        var backend = graph.Options.Profile == "backend";
+        object metadata = new { formatVersion = FormatVersion, command = "export", graph.Scope, graph.Outcome, graph.Match,
             snapshotId = graph.Analysis.Id, analysisContext = graph.Analysis,
             completeness = new QueryCompleteness(graph.Analysis.Coverage, graph.Analysis.Limitations), stale = graph.Analysis.Freshness, freshnessCheck = graph.Analysis.FreshnessCheck,
             truncated = graph.Reasons.Length > 0, truncationReasons = graph.Reasons,
@@ -136,6 +137,20 @@ public static class DeliveryWriter
                 graph.Options.MaxEdges, graph.Options.EvidenceLimit },
             graph.ExaminedEdges, selectedId = graph.Selected?.Symbol.Id, graph.Candidates,
             warnings = new[] { StaticWarning }, sourceIncluded = false };
+        if (backend)
+        {
+            var extended = Object(metadata);
+            extended["selection"] = Object(new
+            {
+                profile = "backend", direction = "outgoing", edgeTypes = DeliveryOptions.BackendEdgeTypes,
+                calls = graph.Options.Calls, includeInferred = true,
+                propertyIdentity = "Roslyn PropertyGet/PropertySet accessor declaration IDs; includes custom bodies",
+                unresolved = graph.Options.Calls == "only-properties" ? "excludedByPropertyFilter" : "retainedWithoutTarget",
+                ordering = "BFS, relationship priority then ordinal ID; not runtime order",
+                filtersAppliedBeforeBudgets = true
+            });
+            metadata = extended;
+        }
         // Stable original IDs; diagram aliases never depend on labels or user-provided syntax.
         var nodes = graph.Nodes.OrderBy(n => n.Symbol.Id, StringComparer.Ordinal).ToArray();
         var edges = graph.Edges.OrderBy(e => e.Relationship.Id, StringComparer.Ordinal).ToArray();
@@ -152,11 +167,28 @@ public static class DeliveryWriter
         output.AppendLine(mermaid ? "flowchart LR" : "digraph UOGraphs {");
         var aliases = nodes.Select((n, i) => (n.Symbol.Id, Alias: "n" + i.ToString("D5", System.Globalization.CultureInfo.InvariantCulture)))
             .ToDictionary(n => n.Id, n => n.Alias, StringComparer.Ordinal);
+        var unresolvedCounts = backend ? edges.Where(e => e.Relationship.Target is null)
+            .GroupBy(e => e.Relationship.Source.Id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal) : null;
         foreach (var node in nodes)
         {
             var label = node.Entity?.QualifiedName ?? node.Symbol.DisplayName;
+            if (backend)
+            {
+                var unresolved = unresolvedCounts!.GetValueOrDefault(node.Symbol.Id);
+                if (unresolved > 0) label += $" [unresolved: {unresolved} collected]";
+            }
             output.Append("  ").Append(aliases[node.Symbol.Id]);
-            if (mermaid) output.Append("[\"").Append(MermaidLabel(label)).AppendLine("\"]");
+            if (mermaid)
+            {
+                var (open, close) = backend ? node.Entity switch
+                {
+                    { HttpEndpoint: not null } or { HttpContract: not null } => ("([\"", "\"])"),
+                    { Message: not null } => ("{{\"", "\"}}"),
+                    _ => ("[\"", "\"]")
+                } : ("[\"", "\"]");
+                output.Append(open).Append(MermaidLabel(label)).AppendLine(close);
+            }
             else output.Append(" [label=\"").Append(DotLabel(label)).AppendLine("\"];");
         }
         foreach (var edge in edges)
@@ -165,8 +197,27 @@ public static class DeliveryWriter
             if (r.Target is null) continue; // unresolved is retained in the evidence comments, never a fake target node.
             var label = r.Kind + " / " + r.Confidence.ToString().ToLowerInvariant();
             output.Append("  ").Append(aliases[r.Source.Id]);
-            if (mermaid) output.Append(" -->|\"").Append(MermaidLabel(label)).Append("\"| ").AppendLine(aliases[r.Target.Id]);
+            if (mermaid) output.Append(backend && r.Confidence == Confidence.Inferred ? " -.->|\"" : " -->|\"")
+                .Append(MermaidLabel(label)).Append("\"| ").AppendLine(aliases[r.Target.Id]);
             else output.Append(" -> ").Append(aliases[r.Target.Id]).Append(" [label=\"").Append(DotLabel(label)).AppendLine("\"];");
+        }
+        if (backend && mermaid)
+        {
+            if (graph.Selected is { } selected)
+            {
+                output.AppendLine("  classDef root fill:#e0f2fe,stroke:#0369a1,stroke-width:3px");
+                output.Append("  class ").Append(aliases[selected.Symbol.Id]).AppendLine(" root");
+            }
+            var note = new[]
+            {
+                "Static relationships; no runtime order or dispatch guarantee.",
+                $"Freshness: {graph.Analysis.Freshness}; coverage: {graph.Analysis.Coverage}.",
+                $"Calls: {graph.Options.Calls}; property filters include custom accessor bodies.",
+                "Solid: exact; dashed: inferred. Unresolved counts: collected records only.",
+                (graph.Reasons.Length > 0 ? "Truncated: " + string.Join(", ", graph.Reasons) : "Selection not truncated") +
+                    $"; outcome: {graph.Outcome}."
+            };
+            output.Append("  backendNote[\"").Append(string.Join("<br/>", note.Select(MermaidLabel))).AppendLine("\"]");
         }
         if (!mermaid) output.AppendLine("}");
         return new(output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal), graph.ExitCode);
